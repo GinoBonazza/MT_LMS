@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="GinoBonazza (ginoandrea.bonazza@usz.ch)" />
+
+
+<title>MT_QC_integration_annotation</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/main/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">MT_LMS</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="about.html">About</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">MT_QC_integration_annotation</h1>
+<h4 class="author">GinoBonazza (<a
+href="mailto:ginoandrea.bonazza@usz.ch"
+class="email">ginoandrea.bonazza@usz.ch</a>)</h4>
+<h4 class="date">16 February, 2026</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span>
+workflowr <span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span>
+</a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2026-02-16
+</p>
+<p>
+<strong>Checks:</strong> <span
+class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7
+<span class="glyphicon glyphicon-exclamation-sign text-danger"
+aria-hidden="true"></span> 0
+</p>
+<p>
+<strong>Knit directory:</strong> <code>MT_LMS/</code> <span
+class="glyphicon glyphicon-question-sign" aria-hidden="true"
+title="This is the local directory in which the code in this file was executed.">
+</span>
+</p>
+<p>
+This reproducible <a href="https://rmarkdown.rstudio.com">R Markdown</a>
+analysis was created with <a
+  href="https://github.com/workflowr/workflowr">workflowr</a> (version
+1.7.2). The <em>Checks</em> tab describes the reproducibility checks
+that were applied when the results were created. The <em>Past
+versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date
+</a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguptodate"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great! Since the R Markdown file has been committed to the Git
+repository, you know the exact version of the code that produced these
+results.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the
+global environment can affect the analysis in your R Markdown file in
+unknown ways. For reproduciblity it’s best to always run the code in an
+empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20260113code">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Seed:</strong>
+<code>set.seed(20260113)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20260113code"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20260113)</code> was run prior to running
+the code in the R Markdown file. Setting a seed ensures that any results
+that rely on randomness, e.g. subsampling or permutations, are
+reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Session information:</strong>
+recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package
+versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be
+confident that you successfully produced the results during this
+run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr
+project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong51f948b">
+<span class="glyphicon glyphicon-ok text-success"
+aria-hidden="true"></span> <strong>Repository version:</strong> 51f948b
+</a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong51f948b"
+class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development
+and connecting the code version to the results is critical for
+reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 51f948b.
+See the <em>Past versions</em> tab to see a history of the changes made
+to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for
+the analysis have been committed to Git prior to generating the results
+(you can use <code>wflow_publish</code> or
+<code>wflow_git_commit</code>). workflowr only checks the R Markdown
+file, but you know if there are other scripts or data files that it
+depends on. Below is the status of the Git repository when the results
+were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/figure/
+
+Untracked files:
+    Untracked:  analysis/QC_integration_annotation.Rmd
+    Untracked:  analysis/omnipathr-log/
+    Untracked:  data/Cellbender_output/
+    Untracked:  data/Cellranger_output/
+    Untracked:  omnipathr-log/
+    Untracked:  output/MT_QC_integration_annotation/
+    Untracked:  output/QC_integration_annotation/
+    Untracked:  renv.lock
+    Untracked:  renv/
+
+Unstaged changes:
+    Modified:   .Rprofile
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not
+included in this status report because it is ok for generated content to
+have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+These are the previous versions of the repository in which changes were
+made to the R Markdown
+(<code>analysis/MT_QC_integration_annotation.Rmd</code>) and HTML
+(<code>docs/MT_QC_integration_annotation.html</code>) files. If you’ve
+configured a remote Git repository (see <code>?wflow_git_remote</code>),
+click on the hyperlinks in the table below to view the files as they
+were in that past version.
+</p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+51f948b
+</td>
+<td>
+GinoBonazza
+</td>
+<td>
+2026-02-16
+</td>
+<td>
+wflow_publish("analysis/MT_QC_integration_annotation.Rmd")
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div id="setup" class="section level2">
+<h2>Setup</h2>
+<pre class="r fold-hide"><code># Get current file name to make folder
+current_file &lt;- &quot;MT_QC_integration_annotation&quot;
+
+# Load libraries
+library(here)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(readr)
+library(readxl)
+library(knitr)
+library(patchwork)
+library(scales)
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(enrichplot)
+
+
+library(Seurat)
+library(DropletUtils)
+library(Matrix)
+library(scDblFinder)
+library(scCustomize)
+library(magrittr)
+library(tidyverse)
+library(reshape2)
+library(S4Vectors)
+library(SingleCellExperiment)
+library(pheatmap)
+library(png)
+library(gridExtra)
+library(Matrix.utils)
+library(scater)
+library(statmod)
+library(clustree)
+library(harmony)
+library(gprofiler2)
+library(AnnotationHub)
+library(ReactomePA)
+library(speckle)
+library(limma)
+library(reactable)
+library(decoupleR)
+library(OmnipathR)
+library(dorothea)
+library(edgeR)
+
+#Output paths
+output_dir_data &lt;- here::here(&quot;output&quot;, current_file)
+if (!dir.exists(output_dir_data)) dir.create(output_dir_data)
+
+if (!dir.exists(here::here(&quot;docs&quot;, &quot;figure&quot;))) dir.create(here::here(&quot;docs&quot;, &quot;figure&quot;))
+
+output_dir_figs &lt;- here::here(&quot;docs&quot;, &quot;figure&quot;, paste0(current_file, &quot;.Rmd&quot;))
+if (!dir.exists(output_dir_figs)) dir.create(output_dir_figs)</code></pre>
+</div>
+<div id="quality-control" class="section level2">
+<h2>Quality Control</h2>
+<p>Load and merge cellbender and cellranger output</p>
+<pre class="r"><code>cell_bender_merged &lt;- Read_CellBender_h5_Multi_File(merge = TRUE,
+                                                    data_dir = here::here(&quot;data&quot;, &quot;Cellbender_output&quot;),
+                                                    custom_name = &quot;_filtered.h5&quot;,
+                                                    sample_list = c(&quot;cellbender_output_Exp1_CMHEF_NC&quot;, 
+                                                                    &quot;cellbender_output_Exp1_CMHEF_TGF&quot;
+                                                                    ),
+                                                    sample_names = c(&quot;Exp1_CMHEF_NC&quot;, 
+                                                                     &quot;Exp1_CMHEF_TGF&quot;)
+                                                    )
+
+cell_ranger_merged &lt;- Read10X_h5_GEO(merge = TRUE,
+                                     data_dir = here::here(&quot;data&quot;, &quot;Cellranger_output&quot;), 
+                                     shared_suffix = &quot;_filtered_feature_bc_matrix.h5&quot;,
+                                     sample_list = c(&quot;Exp1_CMHEF_NC&quot;, 
+                                                     &quot;Exp1_CMHEF_TGF&quot;),
+                                     sample_names = c(&quot;Exp1_CMHEF_NC&quot;, 
+                                                      &quot;Exp1_CMHEF_TGF&quot;)
+                                     )
+
+preQC &lt;- Create_CellBender_Merged_Seurat(raw_cell_bender_matrix = cell_bender_merged, 
+                                             raw_counts_matrix = cell_ranger_merged, 
+                                             raw_assay_name = &quot;RAW&quot;, 
+                                             cell_bender_assay_name = &quot;RNA&quot;)
+rm(cell_bender_merged, cell_ranger_merged)</code></pre>
+<p>Add metadata: percentage of mitochondrial and ribosomal genes,
+clinical data</p>
+<pre class="r"><code>cn &lt;- Cells(preQC)
+
+preQC$Sample &lt;- dplyr::case_when(
+  grepl(&quot;^Exp1_CMHEF_NC[_-]&quot;, cn) ~ &quot;Exp1_CMHEF_NC&quot;,
+  grepl(&quot;^Exp1_CMHEF_TGF[_-]&quot;, cn) ~ &quot;Exp1_CMHEF_TGF&quot;,
+  TRUE ~ NA_character_
+)
+
+table(preQC$Sample, useNA = &quot;ifany&quot;)</code></pre>
+<pre><code>
+ Exp1_CMHEF_NC Exp1_CMHEF_TGF 
+           587           1086 </code></pre>
+<pre class="r"><code>preQC[[&quot;percent.mt&quot;]] &lt;- PercentageFeatureSet(preQC, pattern = &quot;^MT-&quot;)
+preQC[[&quot;percent.rp&quot;]] &lt;- PercentageFeatureSet(preQC, pattern = &quot;^RP[SL]&quot;)</code></pre>
+<p>Check how much Cellbender has affected the dataset</p>
+<pre class="r"><code>table(preQC$Sample)</code></pre>
+<pre><code>
+ Exp1_CMHEF_NC Exp1_CMHEF_TGF 
+           587           1086 </code></pre>
+<pre class="r"><code>preQC &lt;- Add_CellBender_Diff(seurat_object = preQC, 
+                                 raw_assay_name = &quot;RAW&quot;, 
+                                 cell_bender_assay_name = &quot;RNA&quot;)
+
+median_stats &lt;- Median_Stats(seurat_object = preQC, 
+                             group_by_var = &quot;orig.ident&quot;, 
+                             median_var = c(&quot;nCount_Diff&quot;, &quot;nFeature_Diff&quot;))
+median_stats</code></pre>
+<pre><code># A tibble: 2 × 5
+  orig.ident         Median_nCount_RNA Median_nFeature_RNA Median_nCount_Diff
+  &lt;fct&gt;                          &lt;dbl&gt;               &lt;int&gt;              &lt;dbl&gt;
+1 Exp1                           21726                5254                202
+2 Totals (All Cells)             21726                5254                202
+# ℹ 1 more variable: Median_nFeature_Diff &lt;int&gt;</code></pre>
+<pre class="r"><code>feature_diff &lt;- CellBender_Feature_Diff(seurat_object = preQC, 
+                                        raw_assay = &quot;RAW&quot;, 
+                                        cell_bender_assay = &quot;RNA&quot;)
+head(feature_diff)</code></pre>
+<pre><code>                Raw_Counts CellBender_Counts Count_Diff Pct_Diff
+CXCL1                   19                 7         12 63.15789
+S100A1                  16                 6         10 62.50000
+CXCL6                   16                 7          9 56.25000
+CXCL8                   20                10         10 50.00000
+ENSG00000287999         90                47         43 47.77778
+CXCL5                   13                 7          6 46.15385</code></pre>
+<pre class="r"><code>CellBender_Diff_Plot(feature_diff_df = feature_diff)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Cellbender-1.png" width="2100" style="display: block; margin: auto;" /></p>
+<p>Check quality control parameters</p>
+<pre class="r"><code>p1 &lt;- VlnPlot(preQC, features = &quot;nCount_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(preQC, features = &quot;nFeature_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 &lt;- VlnPlot(preQC, features = &quot;percent.mt&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 &lt;- VlnPlot(preQC, features = &quot;percent.rp&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_VlnPlots &lt;- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_VlnPlots</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_pre_VlnPlots-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>p1 &lt;- VlnPlot(preQC, features = &quot;nCount_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(preQC, features = &quot;nFeature_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 6000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 &lt;- VlnPlot(preQC, features = &quot;percent.mt&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 25) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 &lt;- VlnPlot(preQC, features = &quot;percent.rp&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 20) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_VlnPlots_zoom &lt;- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_VlnPlots_zoom</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_pre_VlnPlots_zoom-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<p>Doublets detection</p>
+<pre class="r"><code>preQC_sce &lt;- as.SingleCellExperiment(preQC)
+preQC_sce &lt;- scDblFinder(preQC_sce, samples=&quot;Sample&quot;, clusters = TRUE)</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |===================================                                   |  50%  |                                                                              |======================================================================| 100%</code></pre>
+<pre class="r"><code>table(preQC_sce@colData$scDblFinder.class)</code></pre>
+<pre><code>
+singlet doublet 
+   1596      77 </code></pre>
+<pre class="r"><code>preQC &lt;- as.Seurat(preQC_sce, counts = &quot;counts&quot;, data = &quot;logcounts&quot;)
+rm(preQC_sce)
+preQC@meta.data[preQC@meta.data$scDblFinder.class %in% &quot;singlet&quot;, &quot;scDblFinder.n&quot;] = paste0(&quot;Singlets (n=&quot;, table(preQC$scDblFinder.class)[1], &quot;)&quot;)
+preQC@meta.data[preQC@meta.data$scDblFinder.class %in% &quot;doublet&quot;, &quot;scDblFinder.n&quot;] = paste0(&quot;Doublets (n=&quot;, table(preQC$scDblFinder.class)[2], &quot;)&quot;)
+preQC$scDblFinder.n &lt;- factor(x = preQC$scDblFinder.n, levels = c(rownames(table(preQC$scDblFinder.n))[2], rownames(table(preQC$scDblFinder.n))[1])) </code></pre>
+<pre class="r"><code>p1 &lt;- VlnPlot(preQC, features = c(&quot;nCount_RNA&quot;), split.by = &quot;scDblFinder.n&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 50000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(preQC, features = c(&quot;nFeature_RNA&quot;), split.by = &quot;scDblFinder.n&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) 
+
+QC_pre_Doublets &lt;- p1 + p2 + plot_layout(ncol = 2)
+
+QC_pre_Doublets</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_pre_Doublets-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>saveRDS(preQC, 
+        here::here(output_dir_data, &quot;MT_preQC.rds&quot;))</code></pre>
+<p>Remove doublets</p>
+<pre class="r"><code>preQC_no_doublets &lt;- subset(x = preQC, subset = scDblFinder.class == &quot;singlet&quot;)
+table(preQC_no_doublets@meta.data$scDblFinder.class)</code></pre>
+<pre><code>
+singlet doublet 
+   1596       0 </code></pre>
+<pre class="r"><code>rm(preQC)</code></pre>
+<p>Check quality control parameters after removing doublets</p>
+<pre class="r"><code>p1 &lt;- VlnPlot(preQC_no_doublets, features = &quot;nCount_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(preQC_no_doublets, features = &quot;nFeature_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 &lt;- VlnPlot(preQC_no_doublets, features = &quot;percent.mt&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 &lt;- VlnPlot(preQC_no_doublets, features = &quot;percent.rp&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_no_doublets_VlnPlots &lt;- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_no_doublets_VlnPlots</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_pre_no_doublets_VlnPlots-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>p1 &lt;- VlnPlot(preQC_no_doublets, features = &quot;nCount_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(preQC_no_doublets, features = &quot;nFeature_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 6000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 &lt;- VlnPlot(preQC_no_doublets, features = &quot;percent.mt&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 25) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 &lt;- VlnPlot(preQC_no_doublets, features = &quot;percent.rp&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 20) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_no_doublets_VlnPlots_zoom &lt;- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_no_doublets_VlnPlots_zoom</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_pre_no_doublets_VlnPlots_zoom-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<p>Filter based on number of counts, features and percentage of
+mitochondrial genes</p>
+<pre class="r"><code>postQC &lt;- subset(preQC_no_doublets, subset = 
+                nFeature_RNA &gt; 300 &amp;
+                percent.mt &lt; 20 &amp;
+                nCount_RNA &gt; 500)
+
+table(postQC$Sample)</code></pre>
+<pre><code>
+ Exp1_CMHEF_NC Exp1_CMHEF_TGF 
+           551           1024 </code></pre>
+<p>Check quality control parameters</p>
+<pre class="r"><code>p1 &lt;- VlnPlot(postQC, features = &quot;nCount_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(postQC, features = &quot;nFeature_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 &lt;- VlnPlot(postQC, features = &quot;percent.mt&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 &lt;- VlnPlot(postQC, features = &quot;percent.rp&quot;, group.by = &quot;Sample&quot;, pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_post_VlnPlots &lt;- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_post_VlnPlots</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_post_VlnPlots-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>p1 &lt;- VlnPlot(postQC, features = &quot;nCount_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 &lt;- VlnPlot(postQC, features = &quot;nFeature_RNA&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 6000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 &lt;- VlnPlot(postQC, features = &quot;percent.mt&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 25) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 &lt;- VlnPlot(postQC, features = &quot;percent.rp&quot;, group.by = &quot;Sample&quot;, pt.size = 0, y.max = 20) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_post_VlnPlots_zoom &lt;- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_post_VlnPlots_zoom</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_post_VlnPlots_zoom-1.png" width="2400" style="display: block; margin: auto;" /></p>
+</div>
+<div id="integration-and-clustering" class="section level2">
+<h2>Integration and clustering</h2>
+<p>Normalization and scaling using SCTransform.</p>
+<pre class="r"><code>DefaultAssay(postQC) &lt;- &quot;RNA&quot;
+postQC &lt;- SplitObject(postQC, split.by = &quot;Sample&quot;)
+for (i in 1:length(postQC)) {
+  postQC[[i]] &lt;- SCTransform(postQC[[i]], 
+                             vst.flavor = &quot;v2&quot;, 
+                             vars.to.regress = c(&quot;percent.mt&quot;), 
+                             return.only.var.genes = TRUE,
+                             method = &quot;glmGamPoi&quot;)
+}</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |==================                                                    |  25%  |                                                                              |===================================                                   |  50%  |                                                                              |====================================================                  |  75%  |                                                                              |======================================================================| 100%</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |==                                                                    |   2%  |                                                                              |====                                                                  |   5%  |                                                                              |=====                                                                 |   8%  |                                                                              |=======                                                               |  10%  |                                                                              |=========                                                             |  12%  |                                                                              |==========                                                            |  15%  |                                                                              |============                                                          |  18%  |                                                                              |==============                                                        |  20%  |                                                                              |================                                                      |  22%  |                                                                              |==================                                                    |  25%  |                                                                              |===================                                                   |  28%  |                                                                              |=====================                                                 |  30%  |                                                                              |=======================                                               |  32%  |                                                                              |========================                                              |  35%  |                                                                              |==========================                                            |  38%  |                                                                              |============================                                          |  40%  |                                                                              |==============================                                        |  42%  |                                                                              |================================                                      |  45%  |                                                                              |=================================                                     |  48%  |                                                                              |===================================                                   |  50%  |                                                                              |=====================================                                 |  52%  |                                                                              |======================================                                |  55%  |                                                                              |========================================                              |  58%  |                                                                              |==========================================                            |  60%  |                                                                              |============================================                          |  62%  |                                                                              |==============================================                        |  65%  |                                                                              |===============================================                       |  68%  |                                                                              |=================================================                     |  70%  |                                                                              |===================================================                   |  72%  |                                                                              |====================================================                  |  75%  |                                                                              |======================================================                |  78%  |                                                                              |========================================================              |  80%  |                                                                              |==========================================================            |  82%  |                                                                              |============================================================          |  85%  |                                                                              |=============================================================         |  88%  |                                                                              |===============================================================       |  90%  |                                                                              |=================================================================     |  92%  |                                                                              |==================================================================    |  95%  |                                                                              |====================================================================  |  98%  |                                                                              |======================================================================| 100%</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |==                                                                    |   2%  |                                                                              |====                                                                  |   5%  |                                                                              |=====                                                                 |   8%  |                                                                              |=======                                                               |  10%  |                                                                              |=========                                                             |  12%  |                                                                              |==========                                                            |  15%  |                                                                              |============                                                          |  18%  |                                                                              |==============                                                        |  20%  |                                                                              |================                                                      |  22%  |                                                                              |==================                                                    |  25%  |                                                                              |===================                                                   |  28%  |                                                                              |=====================                                                 |  30%  |                                                                              |=======================                                               |  32%  |                                                                              |========================                                              |  35%  |                                                                              |==========================                                            |  38%  |                                                                              |============================                                          |  40%  |                                                                              |==============================                                        |  42%  |                                                                              |================================                                      |  45%  |                                                                              |=================================                                     |  48%  |                                                                              |===================================                                   |  50%  |                                                                              |=====================================                                 |  52%  |                                                                              |======================================                                |  55%  |                                                                              |========================================                              |  58%  |                                                                              |==========================================                            |  60%  |                                                                              |============================================                          |  62%  |                                                                              |==============================================                        |  65%  |                                                                              |===============================================                       |  68%  |                                                                              |=================================================                     |  70%  |                                                                              |===================================================                   |  72%  |                                                                              |====================================================                  |  75%  |                                                                              |======================================================                |  78%  |                                                                              |========================================================              |  80%  |                                                                              |==========================================================            |  82%  |                                                                              |============================================================          |  85%  |                                                                              |=============================================================         |  88%  |                                                                              |===============================================================       |  90%  |                                                                              |=================================================================     |  92%  |                                                                              |==================================================================    |  95%  |                                                                              |====================================================================  |  98%  |                                                                              |======================================================================| 100%</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |==================                                                    |  25%  |                                                                              |===================================                                   |  50%  |                                                                              |====================================================                  |  75%  |                                                                              |======================================================================| 100%</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |==                                                                    |   2%  |                                                                              |===                                                                   |   4%  |                                                                              |=====                                                                 |   7%  |                                                                              |======                                                                |   9%  |                                                                              |========                                                              |  11%  |                                                                              |=========                                                             |  13%  |                                                                              |===========                                                           |  15%  |                                                                              |============                                                          |  17%  |                                                                              |==============                                                        |  20%  |                                                                              |===============                                                       |  22%  |                                                                              |=================                                                     |  24%  |                                                                              |==================                                                    |  26%  |                                                                              |====================                                                  |  28%  |                                                                              |=====================                                                 |  30%  |                                                                              |=======================                                               |  33%  |                                                                              |========================                                              |  35%  |                                                                              |==========================                                            |  37%  |                                                                              |===========================                                           |  39%  |                                                                              |=============================                                         |  41%  |                                                                              |==============================                                        |  43%  |                                                                              |================================                                      |  46%  |                                                                              |=================================                                     |  48%  |                                                                              |===================================                                   |  50%  |                                                                              |=====================================                                 |  52%  |                                                                              |======================================                                |  54%  |                                                                              |========================================                              |  57%  |                                                                              |=========================================                             |  59%  |                                                                              |===========================================                           |  61%  |                                                                              |============================================                          |  63%  |                                                                              |==============================================                        |  65%  |                                                                              |===============================================                       |  67%  |                                                                              |=================================================                     |  70%  |                                                                              |==================================================                    |  72%  |                                                                              |====================================================                  |  74%  |                                                                              |=====================================================                 |  76%  |                                                                              |=======================================================               |  78%  |                                                                              |========================================================              |  80%  |                                                                              |==========================================================            |  83%  |                                                                              |===========================================================           |  85%  |                                                                              |=============================================================         |  87%  |                                                                              |==============================================================        |  89%  |                                                                              |================================================================      |  91%  |                                                                              |=================================================================     |  93%  |                                                                              |===================================================================   |  96%  |                                                                              |====================================================================  |  98%  |                                                                              |======================================================================| 100%</code></pre>
+<pre><code>  |                                                                              |                                                                      |   0%  |                                                                              |==                                                                    |   2%  |                                                                              |===                                                                   |   4%  |                                                                              |=====                                                                 |   7%  |                                                                              |======                                                                |   9%  |                                                                              |========                                                              |  11%  |                                                                              |=========                                                             |  13%  |                                                                              |===========                                                           |  15%  |                                                                              |============                                                          |  17%  |                                                                              |==============                                                        |  20%  |                                                                              |===============                                                       |  22%  |                                                                              |=================                                                     |  24%  |                                                                              |==================                                                    |  26%  |                                                                              |====================                                                  |  28%  |                                                                              |=====================                                                 |  30%  |                                                                              |=======================                                               |  33%  |                                                                              |========================                                              |  35%  |                                                                              |==========================                                            |  37%  |                                                                              |===========================                                           |  39%  |                                                                              |=============================                                         |  41%  |                                                                              |==============================                                        |  43%  |                                                                              |================================                                      |  46%  |                                                                              |=================================                                     |  48%  |                                                                              |===================================                                   |  50%  |                                                                              |=====================================                                 |  52%  |                                                                              |======================================                                |  54%  |                                                                              |========================================                              |  57%  |                                                                              |=========================================                             |  59%  |                                                                              |===========================================                           |  61%  |                                                                              |============================================                          |  63%  |                                                                              |==============================================                        |  65%  |                                                                              |===============================================                       |  67%  |                                                                              |=================================================                     |  70%  |                                                                              |==================================================                    |  72%  |                                                                              |====================================================                  |  74%  |                                                                              |=====================================================                 |  76%  |                                                                              |=======================================================               |  78%  |                                                                              |========================================================              |  80%  |                                                                              |==========================================================            |  83%  |                                                                              |===========================================================           |  85%  |                                                                              |=============================================================         |  87%  |                                                                              |==============================================================        |  89%  |                                                                              |================================================================      |  91%  |                                                                              |=================================================================     |  93%  |                                                                              |===================================================================   |  96%  |                                                                              |====================================================================  |  98%  |                                                                              |======================================================================| 100%</code></pre>
+<p>PCA without integration</p>
+<pre class="r"><code>features &lt;- SelectIntegrationFeatures(object.list = postQC, nfeatures = 2000)
+not_integrated &lt;- Merge_Seurat_List(postQC)
+VariableFeatures(not_integrated) &lt;- features
+not_integrated &lt;- RunPCA(not_integrated)</code></pre>
+<pre class="r"><code>saveRDS(not_integrated, 
+        here::here(output_dir_data, &quot;MT_not_integrated.rds&quot;))</code></pre>
+<pre class="r"><code>not_integrated &lt;- readRDS(here::here(output_dir_data, &quot;MT_not_integrated.rds&quot;))</code></pre>
+<pre class="r"><code>ElbowPlot(not_integrated, ndims = 50)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Elbow_not_integrated-1.png" width="1200" style="display: block; margin: auto;" /></p>
+<p>Clustering without integration</p>
+<pre class="r"><code>not_integrated &lt;- RunUMAP(not_integrated, dims = 1:30)
+not_integrated &lt;- FindNeighbors(not_integrated, dims = 1:30)
+not_integrated &lt;- FindClusters(not_integrated, resolution = seq(0.1, 0.8, by=0.1))</code></pre>
+<pre class="r"><code>clustree::clustree(not_integrated@meta.data[,grep(&quot;SCT_snn_res&quot;, colnames(not_integrated@meta.data))],
+                   prefix = &quot;SCT_snn_res.&quot;)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Clustree_not_integrated-1.png" width="1800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>DimPlot(not_integrated, reduction = &quot;umap&quot;, shuffle = T,
+        group.by = c(&quot;SCT_snn_res.0.2&quot;, &quot;SCT_snn_res.0.3&quot;, &quot;SCT_snn_res.0.4&quot;, &quot;Sample&quot;), ncol = 2)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/UMAPs_not_integrated-1.png" width="3600" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>saveRDS(not_integrated, 
+        here::here(output_dir_data, &quot;MT_not_integrated.rds&quot;))</code></pre>
+<p>Integrate the samples</p>
+<pre class="r"><code>integrated &lt;- RunHarmony(not_integrated, 
+                     assay.use=&quot;SCT&quot;, 
+                     group.by.vars = &quot;Sample&quot;, 
+                     dims.use = 1:30, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/RunHarmony-1.png" width="2100" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>saveRDS(integrated, 
+        here::here(output_dir_data, &quot;MT.rds&quot;))</code></pre>
+<pre class="r"><code>integrated &lt;- readRDS(here::here(output_dir_data, &quot;MT.rds&quot;))</code></pre>
+<p>Clustering after integration</p>
+<pre class="r"><code>integrated &lt;- RunUMAP(integrated, dims = 1:30, reduction = &quot;harmony&quot;)
+integrated &lt;- FindNeighbors(integrated, dims = 1:30, reduction = &quot;harmony&quot;)
+integrated &lt;- FindClusters(integrated, resolution = seq(0.1, 0.8, by=0.1))</code></pre>
+<pre class="r"><code>clustree::clustree(integrated@meta.data[,grep(&quot;SCT_snn_res&quot;, colnames(integrated@meta.data))],
+                   prefix = &quot;SCT_snn_res.&quot;)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Clustree_integrated-1.png" width="1800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>DimPlot(integrated, reduction = &quot;umap&quot;, shuffle = T,
+        group.by = c(&quot;SCT_snn_res.0.2&quot;, &quot;SCT_snn_res.0.3&quot;, &quot;SCT_snn_res.0.4&quot;, &quot;Sample&quot;), ncol = 2)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/UMAPs_integrated-1.png" width="3600" style="display: block; margin: auto;" /></p>
+<p>Find the markers that characterize each cell population</p>
+<pre class="r"><code>DefaultAssay(integrated) &lt;- &quot;RNA&quot;
+integrated &lt;- NormalizeData(integrated)
+Idents(integrated) &lt;- &quot;SCT_snn_res.0.2&quot;
+Markers &lt;- FindAllMarkers(integrated, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers, here::here(output_dir_data, &quot;MT_Markers_all.csv&quot;))
+Markers_top10 &lt;- as.data.frame(Markers %&gt;% group_by(cluster) %&gt;% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10, here::here(output_dir_data, &quot;MT_Markers_top10.csv&quot;))
+Markers_top3 &lt;- as.data.frame(Markers %&gt;% group_by(cluster) %&gt;% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3, here::here(output_dir_data, &quot;MT_Markers_top3.csv&quot;))</code></pre>
+<p>Check QC parameters in each cluster</p>
+<pre class="r"><code>VlnPlot(integrated, features = c(&quot;nCount_RNA&quot;, &quot;nFeature_RNA&quot;, &quot;percent.mt&quot;, &quot;percent.rp&quot;), ncol = 2) + theme(axis.title.x = element_blank())</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/QC_VlnPlots-1.png" width="3000" style="display: block; margin: auto;" /></p>
+<p>Check cell cycle genes</p>
+<pre class="r"><code>DefaultAssay(integrated) &lt;- &quot;RNA&quot;
+s.genes &lt;- cc.genes$s.genes
+g2m.genes &lt;- cc.genes$g2m.genes
+integrated &lt;- CellCycleScoring(integrated, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated, reduction = &quot;umap&quot;, shuffle = T,
+        group.by = &quot;Phase&quot;)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Cell_cycle_UMAP-1.png" width="1500" style="display: block; margin: auto;" /></p>
+</div>
+<div id="cell-type-annotation" class="section level2">
+<h2>Cell type annotation</h2>
+<p>Annotate the clusters based on the characteristic markers</p>
+<pre class="r"><code>integrated@meta.data[integrated@meta.data$SCT_snn_res.0.2 %in% c(&quot;0&quot;), &quot;cell_type&quot;] = &quot;Cardiomyocytes I&quot;
+integrated@meta.data[integrated@meta.data$SCT_snn_res.0.2 %in% c(&quot;1&quot;), &quot;cell_type&quot;] = &quot;Fibroblasts&quot;
+integrated@meta.data[integrated@meta.data$SCT_snn_res.0.2 %in% c(&quot;2&quot;), &quot;cell_type&quot;] = &quot;Cardiomyocytes II&quot;
+integrated@meta.data[integrated@meta.data$SCT_snn_res.0.2 %in% c(&quot;3&quot;), &quot;cell_type&quot;] = &quot;Proliferating cells&quot;
+integrated$cell_type &lt;- factor(integrated$cell_type, levels = c(&quot;Cardiomyocytes I&quot;, 
+                                                                        &quot;Fibroblasts&quot;,
+                                                                        &quot;Cardiomyocytes II&quot;,
+                                                                        &quot;Proliferating cells&quot;))
+Idents(integrated) &lt;- integrated$cell_type</code></pre>
+<pre class="r"><code>integrated &lt;- ScaleData(integrated)
+mapal &lt;- colorRampPalette(RColorBrewer::brewer.pal(9,&quot;RdBu&quot;))(256)
+mapal &lt;- rev(mapal[1:256])
+cluster_palette &lt;- c(&quot;#F8766D&quot;,&quot;#24B700&quot;, &quot;#00ACFC&quot;, &quot;#D575FE&quot;)
+Heatmap &lt;- DoHeatmap(integrated, draw.line = F, features = Markers_top10$gene, group.colors = cluster_palette) +
+  guides(colour=FALSE) +
+  scale_fill_gradientn(colours = mapal) +
+  theme(text = element_text(size = 15), axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.1, 0, 0, 0), 
+                           &quot;inches&quot;))
+Heatmap</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Heatmap-1.png" width="3600" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>p &lt;- DimPlot(integrated, group.by = &quot;cell_type&quot;, reduction = &quot;umap&quot;, label = F, cols = cluster_palette) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = &quot;bold&quot;), axis.title = element_text(size = 18, face = &quot;bold&quot;)) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = &quot;cell_type&quot;, fontface = &quot;bold&quot;, size = 5.5, repel = T)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/UMAP_cell_type-1.png" width="1950" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>DotPlot(integrated, assay = &quot;SCT&quot;, features = rev(Markers_top3$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           &quot;inches&quot;))</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/DotPlot_markers-1.png" width="1800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>Markers_top5 &lt;- as.data.frame(Markers %&gt;% group_by(cluster) %&gt;% top_n(n = 5, wt = avg_log2FC))
+Idents(integrated) &lt;- factor(integrated$cell_type, levels = rev(levels(integrated$cell_type)))
+DotPlot(integrated, assay = &quot;SCT&quot;, features = Markers_top5$gene, dot.scale = 5) +
+  RotatedAxis() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           &quot;inches&quot;))</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/DotPlot_markers_2-1.png" width="3000" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>FeaturePlot_scCustom(integrated, features = c(&quot;EMC10&quot;, &quot;COL3A1&quot;, &quot;TNNC1&quot;, &quot;TOP2A&quot;), num_columns = 4)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/FeatPlot_markers-1.png" width="4800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>FeaturePlot_scCustom(integrated, features = c(&quot;nCount_RNA&quot;, &quot;nFeature_RNA&quot;, &quot;percent.mt&quot;, &quot;percent.rp&quot;), num_columns = 4)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/FeatPlot_markers_2-1.png" width="4800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>FeaturePlot_scCustom(integrated, features = c(&quot;RYR2&quot;, &quot;FGF12&quot;, &quot;COL1A1&quot;, &quot;FN1&quot;, &quot;VWF&quot;, &quot;PECAM1&quot;, &quot;MKI67&quot;, &quot;TOP2A&quot;, &quot;nCount_RNA&quot;, &quot;nFeature_RNA&quot;, &quot;percent.mt&quot;, &quot;percent.rp&quot;), num_columns = 4)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/FeatPlot_markers_3-1.png" width="4800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>FeaturePlot_scCustom(integrated, features = c(&quot;RYR2&quot;, &quot;FGF12&quot;, &quot;COL1A1&quot;, &quot;FN1&quot;, &quot;VWF&quot;, &quot;PECAM1&quot;, &quot;MKI67&quot;, &quot;TOP2A&quot;, &quot;nCount_RNA&quot;, &quot;nFeature_RNA&quot;, &quot;percent.mt&quot;, &quot;percent.rp&quot;), num_columns = 4, order = F)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/FeatPlot_markers_4-1.png" width="4800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>FeaturePlot_scCustom(integrated, features = c(&quot;VWF&quot;, &quot;CDH5&quot;, &quot;PECAM1&quot;, &quot;CD34&quot;, &quot;ESAM&quot;, &quot;ANO2&quot;, &quot;KDR&quot;, &quot;FLT1&quot;, &quot;RAMP2&quot;, &quot;ENG&quot;, &quot;ROBO4&quot;, &quot;EMCN&quot;, &quot;CD36&quot;, &quot;SLC9A3R2&quot;), num_columns = 4, order = F)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/FeatPlot_markers_5-1.png" width="4800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>genes_score &lt;- c(&quot;VWF&quot;, &quot;CDH5&quot;, &quot;PECAM1&quot;, &quot;CD34&quot;, &quot;ESAM&quot;, &quot;ANO2&quot;, &quot;KDR&quot;, &quot;RAMP2&quot;, &quot;ROBO4&quot;, &quot;EMCN&quot;)
+
+integrated &lt;- AddModuleScore(
+  object   = integrated,
+  features = list(genes_score),
+  name     = &quot;EC score&quot;
+)
+integrated$`EC score` &lt;- integrated$`EC score1`
+integrated$`EC score1` &lt;- NULL
+
+FeaturePlot_scCustom(
+  integrated,
+  features = &quot;EC score&quot;,
+  reduction = &quot;umap&quot;,
+  order = F
+)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/unnamed-chunk-14-1.png" width="3600" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>FeaturePlot_scCustom(
+  integrated,
+  features = &quot;EC score&quot;,
+  reduction = &quot;umap&quot;,
+  order = T, na_cutoff = 0.5,
+  split.by=&quot;Sample&quot;
+)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/unnamed-chunk-14-2.png" width="3600" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>integrated[[]] %&gt;%
+  mutate(EC_high = (`EC score` &gt; 0.5)) %&gt;%
+  group_by(Sample) %&gt;%
+  summarise(
+    n_cells = n(),
+    n_EC_high = sum(EC_high, na.rm = TRUE),
+    frac_EC_high = n_EC_high / n_cells
+  )</code></pre>
+<pre><code># A tibble: 2 × 4
+  Sample         n_cells n_EC_high frac_EC_high
+  &lt;chr&gt;            &lt;int&gt;     &lt;int&gt;        &lt;dbl&gt;
+1 Exp1_CMHEF_NC      552         2      0.00362
+2 Exp1_CMHEF_TGF    1029         5      0.00486</code></pre>
+<pre class="r"><code>DefaultAssay(integrated) &lt;- &quot;RNA&quot;
+Idents(integrated) &lt;- &quot;cell_type&quot;
+Markers &lt;- FindAllMarkers(integrated, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers, here::here(output_dir_data, &quot;MT_Markers_all_cell_type.csv&quot;))
+Markers_top10 &lt;- as.data.frame(Markers %&gt;% group_by(cluster) %&gt;% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10, here::here(output_dir_data, &quot;MT_Markers_top10_cell_type.csv&quot;))
+Markers_top3 &lt;- as.data.frame(Markers %&gt;% group_by(cluster) %&gt;% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3, here::here(output_dir_data, &quot;MT_Markers_top3_cell_type.csv&quot;))</code></pre>
+<pre class="r"><code>df &lt;- Markers[,7:6]
+dfsample &lt;- split(df$gene,df$cluster)
+length(dfsample)</code></pre>
+<pre><code>[1] 4</code></pre>
+<pre class="r"><code>dfsample$`Cardiomyocytes I` = bitr(dfsample$`Cardiomyocytes I`, fromType=&quot;SYMBOL&quot;, toType=&quot;ENTREZID&quot;, OrgDb=&quot;org.Hs.eg.db&quot;)
+dfsample$`Fibroblasts` = bitr(dfsample$`Fibroblasts`, fromType=&quot;SYMBOL&quot;, toType=&quot;ENTREZID&quot;, OrgDb=&quot;org.Hs.eg.db&quot;)
+dfsample$`Cardiomyocytes II` = bitr(dfsample$`Cardiomyocytes II`, fromType=&quot;SYMBOL&quot;, toType=&quot;ENTREZID&quot;, OrgDb=&quot;org.Hs.eg.db&quot;)
+dfsample$`Proliferating cells` = bitr(dfsample$`Proliferating cells`, fromType=&quot;SYMBOL&quot;, toType=&quot;ENTREZID&quot;, OrgDb=&quot;org.Hs.eg.db&quot;)
+
+#do the same here, a line like below for each cluster
+genelist &lt;- list(&quot;Cardiomyocytes I&quot; = dfsample$`Cardiomyocytes I`$ENTREZID, 
+                 &quot;Fibroblasts&quot; = dfsample$`Fibroblasts`$ENTREZID,
+                 &quot;Cardiomyocytes II&quot; = dfsample$`Cardiomyocytes II`$ENTREZID,
+                 &quot;Proliferating cells&quot; = dfsample$`Proliferating cells`$ENTREZID
+)
+
+# Calculate gene counts across cells
+gene_counts &lt;- rowSums(integrated@assays$RNA@counts &gt; 0)
+
+# Filter genes to include only those expressed in at least 3 cells
+universe_genes &lt;- names(gene_counts[gene_counts &gt;= 3])
+
+# Convert universe gene symbols to Entrez IDs
+universe_entrez &lt;- bitr(universe_genes, fromType = &quot;SYMBOL&quot;, toType = &quot;ENTREZID&quot;, OrgDb = org.Hs.eg.db)$ENTREZID</code></pre>
+<pre class="r"><code>GO_MF &lt;- compareCluster(geneCluster = genelist, fun = &quot;enrichGO&quot;, ont = &quot;ALL&quot;,  OrgDb = &quot;org.Hs.eg.db&quot;, universe = universe_entrez)
+GO_MF &lt;- gsfilter(GO_MF, by = &#39;Count&#39;, min = 3)
+dotplot(GO_MF, label_format = 35, title = &quot;GO Over-representation analysis&quot;) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Pathways_GO_MF-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>GO_MF_simplified &lt;- clusterProfiler::simplify(
+  GO_MF,
+  cutoff = 0.7,
+  by = &quot;p.adjust&quot;,
+  select_fun = min,
+  measure = &quot;Wang&quot;,
+  semData = NULL
+)
+dotplot(GO_MF_simplified, label_format = 40, title = &quot;Over-representation analysis&quot;) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Pathways_GO_MF_simplified-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>props &lt;- getTransformedProps(
+  integrated$cell_type,
+  integrated$Sample,
+  transform = &quot;logit&quot;
+)
+
+df &lt;- as.data.frame(props$Proportions) %&gt;%
+  dplyr::rename(
+    cell_type   = clusters,
+    Sample      = sample,
+    Proportion  = Freq
+  )
+
+p &lt;- ggplot(df, aes(x = Sample, y = Proportion, fill = cell_type)) +
+  geom_col(
+    width = 0.8,
+    color = &quot;black&quot;,      # black borders
+    linewidth = 0.5       # thin, publication-style
+  ) +
+  scale_fill_manual(values = cluster_palette) +
+  labs(y = &quot;Proportions&quot;, x = NULL) +
+  theme_classic(base_size = 15) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, face = &quot;bold&quot;),
+    axis.title.y = element_text(face = &quot;bold&quot;),
+    legend.position = &quot;right&quot;,
+    legend.title = element_blank()
+  )
+
+p</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Barplot_Sample-1.png" width="1800" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>metadata &lt;- integrated@meta.data
+
+cell_type_sample_table &lt;- table(metadata$cell_type, metadata$Sample)
+cell_type_sample_df &lt;- as.data.frame.matrix(cell_type_sample_table)
+
+cell_type_sample_df[&quot;Total&quot;, ] &lt;- colSums(cell_type_sample_df)
+cell_type_sample_df$Total &lt;- rowSums(cell_type_sample_df)
+
+library(gridExtra)
+library(grid)
+
+table_plot &lt;- tableGrob(cell_type_sample_df)
+
+grid.newpage()
+grid.draw(table_plot)</code></pre>
+<p><img src="figure/MT_QC_integration_annotation.Rmd/Cell_type_sample_table-1.png" width="2400" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>integrated@assays[[&quot;RAW&quot;]] &lt;- NULL
+saveRDS(integrated, 
+        here::here(output_dir_data, &quot;MT.rds&quot;))</code></pre>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span>
+Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.5.2 (2025-10-31)
+Platform: x86_64-pc-linux-gnu
+Running under: Ubuntu 24.04.3 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
+LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so;  LAPACK version 3.12.0
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+ [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+
+time zone: Etc/UTC
+tzcode source: system (glibc)
+
+attached base packages:
+[1] grid      stats4    stats     graphics  grDevices datasets  utils    
+[8] methods   base     
+
+other attached packages:
+ [1] edgeR_4.8.0                 dorothea_1.22.0            
+ [3] OmnipathR_3.18.2            decoupleR_2.16.0           
+ [5] reactable_0.4.5             limma_3.66.0               
+ [7] speckle_1.10.0              ReactomePA_1.54.0          
+ [9] AnnotationHub_4.0.0         BiocFileCache_3.0.0        
+[11] dbplyr_2.5.1                gprofiler2_0.2.4           
+[13] harmony_1.2.4               Rcpp_1.1.0                 
+[15] clustree_0.5.1              ggraph_2.2.2               
+[17] statmod_1.5.1               scater_1.38.0              
+[19] scuttle_1.20.0              Matrix.utils_0.9.7         
+[21] gridExtra_2.3               png_0.1-8                  
+[23] pheatmap_1.0.13             reshape2_1.4.5             
+[25] lubridate_1.9.4             forcats_1.0.1              
+[27] stringr_1.6.0               purrr_1.2.0                
+[29] tidyr_1.3.1                 tidyverse_2.0.0            
+[31] magrittr_2.0.4              scCustomize_3.2.2          
+[33] scDblFinder_1.24.0          Matrix_1.6-5               
+[35] DropletUtils_1.30.0         SingleCellExperiment_1.32.0
+[37] SummarizedExperiment_1.40.0 GenomicRanges_1.62.0       
+[39] Seqinfo_1.0.0               MatrixGenerics_1.22.0      
+[41] matrixStats_1.5.0           SeuratObject_5.0.2         
+[43] Seurat_4.4.0                enrichplot_1.30.4          
+[45] org.Hs.eg.db_3.22.0         AnnotationDbi_1.72.0       
+[47] IRanges_2.44.0              S4Vectors_0.48.0           
+[49] Biobase_2.70.0              BiocGenerics_0.56.0        
+[51] generics_0.1.4              clusterProfiler_4.18.2     
+[53] scales_1.4.0                patchwork_1.3.2            
+[55] knitr_1.50                  readxl_1.4.5               
+[57] readr_2.1.6                 tibble_3.3.0               
+[59] ggplot2_4.0.1               dplyr_1.1.4                
+[61] here_1.0.2                  workflowr_1.7.2            
+
+loaded via a namespace (and not attached):
+  [1] igraph_2.2.1              graph_1.88.0             
+  [3] ica_1.0-3                 plotly_4.11.0            
+  [5] rematch2_2.1.2            tidyselect_1.2.1         
+  [7] rvest_1.0.5               bit_4.6.0                
+  [9] lattice_0.22-7            rjson_0.2.23             
+ [11] blob_1.2.4                S4Arrays_1.10.1          
+ [13] parallel_4.5.2            cli_3.6.5                
+ [15] ggplotify_0.1.3           goftest_1.2-3            
+ [17] BiocIO_1.20.0             glmGamPoi_1.22.0         
+ [19] bluster_1.20.0            grr_0.9.5                
+ [21] BiocNeighbors_2.4.0       uwot_0.2.4               
+ [23] curl_7.0.0                mime_0.13                
+ [25] evaluate_1.0.5            tidytree_0.4.6           
+ [27] leiden_0.4.3.1            stringi_1.8.7            
+ [29] backports_1.5.0           XML_3.99-0.20            
+ [31] httpuv_1.6.16             paletteer_1.6.0          
+ [33] rappdirs_0.3.3            splines_4.5.2            
+ [35] bcellViper_1.46.0         logger_0.4.1             
+ [37] sctransform_0.4.2         ggbeeswarm_0.7.3         
+ [39] sessioninfo_1.2.3         DBI_1.2.3                
+ [41] HDF5Array_1.38.0          jquerylib_0.1.4          
+ [43] reactome.db_1.94.0        withr_3.0.2              
+ [45] git2r_0.36.2              systemfonts_1.3.1        
+ [47] rprojroot_2.1.1           xgboost_3.1.2.1          
+ [49] lmtest_0.9-40             ggnewscale_0.5.2         
+ [51] tidygraph_1.3.1           rtracklayer_1.70.0       
+ [53] BiocManager_1.30.27       htmlwidgets_1.6.4        
+ [55] fs_1.6.6                  ggrepel_0.9.6            
+ [57] labeling_0.4.3            SparseArray_1.10.4       
+ [59] cellranger_1.1.0          h5mread_1.2.1            
+ [61] reticulate_1.44.1         zoo_1.8-14               
+ [63] XVector_0.50.0            UCSC.utils_1.6.0         
+ [65] RhpcBLASctl_0.23-42       timechange_0.3.0         
+ [67] data.table_1.17.8         ggtree_4.0.1             
+ [69] rhdf5_2.54.0              R.oo_1.27.1              
+ [71] ggiraph_0.9.2             irlba_2.3.5.1            
+ [73] ggrastr_1.0.2             gridGraphics_0.5-1       
+ [75] lazyeval_0.2.2            yaml_2.3.11              
+ [77] survival_3.8-3            scattermore_1.2          
+ [79] BiocVersion_3.22.0        crayon_1.5.3             
+ [81] RcppAnnoy_0.0.22          RColorBrewer_1.1-3       
+ [83] progressr_0.18.0          tweenr_2.0.3             
+ [85] later_1.4.4               ggridges_0.5.7           
+ [87] codetools_0.2-20          GlobalOptions_0.1.3      
+ [89] KEGGREST_1.50.0           Rtsne_0.17               
+ [91] shape_1.4.6.1             gdtools_0.4.4            
+ [93] Rsamtools_2.26.0          filelock_1.0.3           
+ [95] pkgconfig_2.0.3           xml2_1.5.1               
+ [97] spatstat.univar_3.1-5     GenomicAlignments_1.46.0 
+ [99] getPass_0.2-4             aplot_0.2.9              
+[101] spatstat.sparse_3.1-0     ape_5.8-1                
+[103] viridisLite_0.4.2         xtable_1.8-4             
+[105] plyr_1.8.9                httr_1.4.7               
+[107] tools_4.5.2               globals_0.18.0           
+[109] beeswarm_0.4.0            checkmate_2.3.3          
+[111] nlme_3.1-168              hdf5r_1.3.12             
+[113] digest_0.6.39             farver_2.1.2             
+[115] tzdb_0.5.0                yulab.utils_0.2.2        
+[117] viridis_0.6.5             glue_1.8.0               
+[119] cachem_1.1.0              polyclip_1.10-7          
+[121] Biostrings_2.78.0         parallelly_1.45.1        
+[123] ScaledMatrix_1.18.0       fontBitstreamVera_0.1.1  
+[125] pbapply_1.7-4             httr2_1.2.1              
+[127] tcltk_4.5.2               spam_2.11-1              
+[129] gson_0.1.0                dqrng_0.4.1              
+[131] utf8_1.2.6                graphlayouts_1.2.2       
+[133] shiny_1.12.0              tidydr_0.0.6             
+[135] R.utils_2.13.0            rhdf5filters_1.22.0      
+[137] RCurl_1.98-1.17           memoise_2.0.1            
+[139] rmarkdown_2.30            R.methodsS3_1.8.2        
+[141] future_1.68.0             RANN_2.6.2               
+[143] fontLiberation_0.1.0      renv_1.1.5               
+[145] spatstat.data_3.1-9       rstudioapi_0.17.1        
+[147] cluster_2.1.8.1           whisker_0.4.1            
+[149] janitor_2.2.1             spatstat.utils_3.2-0     
+[151] hms_1.1.4                 fitdistrplus_1.2-4       
+[153] cowplot_1.2.0             colorspace_2.1-2         
+[155] rlang_1.1.6               GenomeInfoDb_1.46.1      
+[157] DelayedMatrixStats_1.32.0 sparseMatrixStats_1.22.0 
+[159] dotCall64_1.2             ggforce_0.5.0            
+[161] circlize_0.4.16           ggtangle_0.0.9           
+[163] xfun_0.54                 abind_1.4-8              
+[165] GOSemSim_2.36.0           treeio_1.34.0            
+[167] Rhdf5lib_1.32.0           bitops_1.0-9             
+[169] ps_1.9.1                  promises_1.5.0           
+[171] scatterpie_0.2.6          RSQLite_2.4.5            
+[173] qvalue_2.42.0             fgsea_1.36.0             
+[175] DelayedArray_0.36.0       GO.db_3.22.0             
+[177] compiler_4.5.2            prettyunits_1.2.0        
+[179] beachmat_2.26.0           graphite_1.56.0          
+[181] listenv_0.10.0            fontquiver_0.2.1         
+[183] BiocSingular_1.26.1       tensor_1.5.1             
+[185] MASS_7.3-65               progress_1.2.3           
+[187] BiocParallel_1.44.0       spatstat.random_3.4-3    
+[189] R6_2.6.1                  fastmap_1.2.0            
+[191] fastmatch_1.1-6           vipor_0.4.7              
+[193] ROCR_1.0-11               rsvd_1.0.5               
+[195] gtable_0.3.6              KernSmooth_2.23-26       
+[197] miniUI_0.1.2              deldir_2.0-4             
+[199] htmltools_0.5.9           bit64_4.6.0-1            
+[201] spatstat.explore_3.6-0    lifecycle_1.0.4          
+[203] ggprism_1.0.7             S7_0.2.1                 
+[205] zip_2.3.3                 processx_3.8.6           
+[207] callr_3.7.6               restfulr_0.0.16          
+[209] sass_0.4.10               vctrs_0.6.5              
+[211] spatstat.geom_3.6-1       snakecase_0.11.1         
+[213] DOSE_4.4.0                scran_1.38.0             
+[215] ggfun_0.2.0               sp_2.2-0                 
+[217] future.apply_1.20.0       bslib_0.9.0              
+[219] pillar_1.11.1             metapod_1.18.0           
+[221] locfit_1.5-9.12           otel_0.2.0               
+[223] jsonlite_2.0.0            cigarillo_1.0.0          </code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+https://docs.mathjax.org/en/latest/web/configuration.html. This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
