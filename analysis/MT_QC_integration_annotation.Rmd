@@ -642,6 +642,76 @@ grid.newpage()
 grid.draw(table_plot)
 ```
 
+```{r, fig.width=24, fig.height=16}
+VlnPlot(subset(integrated, cell_type == "Fibroblasts"), features = c("SERPINE1", "SMAD7", "TGFB1", "CCN2", "SKIL", "PMEPA1", "ACTA2", "TAGLN", "CNN1", "MYL9", "TPM1", "TPM2", "MYH9", "VIM", "COL1A1", "COL1A2", "COL3A1", "FN1", "POSTN", "VCAN", "LOX", "LOXL2", "TIMP1", "MMP2"), ncol = 6, group.by = "Sample")
+```
+
+
+```{r, fig.width=10, fig.height=3.5}
+DotPlot_scCustom(subset(integrated, cell_type == "Fibroblasts"), assay = "RNA", features = c("SERPINE1", "SMAD7", "TGFB1", "CCN2", "SKIL", "PMEPA1", "ACTA2", "TAGLN", "CNN1", "MYL9", "TPM1", "TPM2", "MYH9", "VIM", "COL1A1", "COL1A2", "COL3A1", "FN1", "POSTN", "VCAN", "LOX", "LOXL2", "TIMP1", "MMP2"), dot.scale = 5,  group.by = "Sample", scale = FALSE) +
+  RotatedAxis() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r}
+FB_markers <- FindMarkers(subset(integrated, cell_type == "Fibroblasts"), group.by = "Sample", ident.1 = "Exp1_CMHEF_TGF", ident.2 = "Exp1_CMHEF_NC", features = c("SERPINE1", "SMAD7", "TGFB1", "CCN2", "SKIL", "PMEPA1", "ACTA2", "TAGLN", "CNN1", "MYL9", "TPM1", "TPM2", "MYH9", "VIM", "COL1A1", "COL1A2", "COL3A1", "FN1", "POSTN", "VCAN", "LOX", "LOXL2", "TIMP1", "MMP2"), logfc.threshold = 0)
+# 1) gene -> category mapping
+gene_category <- c(
+  # direct TGF-β / SMAD response
+  SERPINE1 = "Direct TGF-β response",
+  SMAD7    = "Direct TGF-β response",
+  TGFB1    = "Direct TGF-β response",
+  CCN2     = "Direct TGF-β response",
+  SKIL     = "Direct TGF-β response",
+  PMEPA1   = "Direct TGF-β response",
+
+  # myofibroblast activation / contractile machinery
+  ACTA2 = "Myofibroblast/contractile",
+  TAGLN = "Myofibroblast/contractile",
+  CNN1  = "Myofibroblast/contractile",
+  MYL9  = "Myofibroblast/contractile",
+  TPM1  = "Myofibroblast/contractile",
+  TPM2  = "Myofibroblast/contractile",
+  MYH9  = "Myofibroblast/contractile",
+  VIM   = "Myofibroblast/contractile",
+
+  # ECM production / matrix accumulation
+  COL1A1 = "ECM production",
+  COL1A2 = "ECM production",
+  COL3A1 = "ECM production",
+  FN1    = "ECM production",
+  POSTN  = "ECM production",
+  VCAN   = "ECM production",
+
+  # ECM remodeling / crosslinking
+  LOX   = "ECM remodeling/crosslinking",
+  LOXL2 = "ECM remodeling/crosslinking",
+  TIMP1 = "ECM remodeling/crosslinking",
+  MMP2  = "ECM remodeling/crosslinking"
+)
+
+# 2) add gene symbol column + category
+FB_markers$gene <- rownames(FB_markers)
+FB_markers$category <- unname(gene_category[FB_markers$gene])
+
+# add regulation label
+FB_markers$regulation <- with(FB_markers, ifelse(
+  !is.na(p_val_adj) & p_val_adj < 0.1 & avg_log2FC >= 0.5, "Upregulated",
+  ifelse(!is.na(p_val_adj) & p_val_adj < 0.1 & avg_log2FC <= -0.5, "Downregulated",
+         "Not significant")
+))
+
+# optional: order columns
+FB_markers <- FB_markers[, c("gene", "category", "regulation",
+                            setdiff(colnames(FB_markers), c("gene","category","regulation")))]
+
+# optional: order rows
+FB_markers <- FB_markers[order(FB_markers$category, FB_markers$regulation, -FB_markers$avg_log2FC), ]
+
+FB_markers
+```
+
 ```{r, eval = FALSE}
 integrated@assays[["RAW"]] <- NULL
 saveRDS(integrated, 
