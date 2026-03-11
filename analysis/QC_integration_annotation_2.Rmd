@@ -1,0 +1,1555 @@
+---
+title: "QC_integration_annotation_2"
+author: "GinoBonazza (ginoandrea.bonazza@usz.ch)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r knitr config, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+
+knitr::opts_chunk$set(message = FALSE)
+
+knitr::opts_chunk$set(cache = FALSE)
+
+knitr::opts_chunk$set(dpi = 300, fig.align = "center")
+```
+
+## Setup
+
+```{r setup, class.source = "fold-hide"}
+# Get current file name to make folder
+current_file <- "QC_integration_annotation_2"
+
+# Load libraries
+library(here)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(readr)
+library(readxl)
+library(knitr)
+library(patchwork)
+library(scales)
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(enrichplot)
+
+
+library(Seurat)
+library(DropletUtils)
+library(Matrix)
+library(scDblFinder)
+library(scCustomize)
+library(magrittr)
+library(tidyverse)
+library(reshape2)
+library(S4Vectors)
+library(SingleCellExperiment)
+library(pheatmap)
+library(png)
+library(gridExtra)
+library(Matrix.utils)
+library(scater)
+library(statmod)
+library(clustree)
+library(harmony)
+library(gprofiler2)
+library(AnnotationHub)
+library(ReactomePA)
+library(speckle)
+library(limma)
+library(reactable)
+library(decoupleR)
+library(OmnipathR)
+library(dorothea)
+library(edgeR)
+library(qs2)
+
+#Output paths
+output_dir_data <- here::here("output", current_file)
+if (!dir.exists(output_dir_data)) dir.create(output_dir_data)
+
+if (!dir.exists(here::here("docs", "figure"))) dir.create(here::here("docs", "figure"))
+
+output_dir_figs <- here::here("docs", "figure", paste0(current_file, ".Rmd"))
+if (!dir.exists(output_dir_figs)) dir.create(output_dir_figs)
+```
+
+
+## Quality Control
+
+Load and merge cellbender and cellranger output
+
+```{r load data, echo=T, results= "hide"}
+cell_bender_merged <- Read_CellBender_h5_Multi_File(
+  merge = TRUE,
+  data_dir = here::here("data", "Cellbender_output"),
+  custom_name = "_filtered.h5",
+  
+  sample_list = c(
+    "cellbender_output_Exp1_CMHEF_NC",
+    "cellbender_output_Exp1_CMHEF_TGF",
+    "cellbender_output_Exp3_CMDEF_NC",
+    "cellbender_output_Exp3_CMDEF_TGF",
+    "cellbender_output_Exp3_CMHEF_NC",
+#    "cellbender_output_Exp3_CMHEF_TGF",
+    "cellbender_output_Exp4_CMDEF_NC",
+    "cellbender_output_Exp4_CMDEF_TGF",
+    "cellbender_output_Exp4_CMHEF_EC_pretreated_TGF",
+    "cellbender_output_Exp4_CMHEF_EC_pretreated_TNF",
+    "cellbender_output_Exp4_CMHEF_NC",
+    "cellbender_output_Exp4_CMHEF_TGF",
+    "cellbender_output_Exp4_EC_diseased",
+    "cellbender_output_Exp4_EC_healthy"
+  ),
+  
+  sample_names = c(
+    "Exp1_CMHEF_NC",
+    "Exp1_CMHEF_TGF",
+    "Exp3_CMDEF_NC",
+    "Exp3_CMDEF_TGF",
+    "Exp3_CMHEF_NC",
+#    "Exp3_CMHEF_TGF",
+    "Exp4_CMDEF_NC",
+    "Exp4_CMDEF_TGF",
+    "Exp4_CMHEF_EC_pretreated_TGF",
+    "Exp4_CMHEF_EC_pretreated_TNF",
+    "Exp4_CMHEF_NC",
+    "Exp4_CMHEF_TGF",
+    "Exp4_EC_diseased",
+    "Exp4_EC_healthy"
+  )
+)
+
+cell_ranger_merged <- Read10X_h5_GEO(
+  merge = TRUE,
+  data_dir = here::here("data", "Cellranger_output"),
+  shared_suffix = "_filtered_feature_bc_matrix.h5",
+  
+  sample_list = c(
+    "Exp1_CMHEF_NC",
+    "Exp1_CMHEF_TGF",
+    "Exp3_CMDEF_NC",
+    "Exp3_CMDEF_TGF",
+    "Exp3_CMHEF_NC",
+#    "Exp3_CMHEF_TGF",
+    "Exp4_CMDEF_NC",
+    "Exp4_CMDEF_TGF",
+    "Exp4_CMHEF_EC_pretreated_TGF",
+    "Exp4_CMHEF_EC_pretreated_TNF",
+    "Exp4_CMHEF_NC",
+    "Exp4_CMHEF_TGF",
+    "Exp4_EC_diseased",
+    "Exp4_EC_healthy"
+  ),
+  
+  sample_names = c(
+    "Exp1_CMHEF_NC",
+    "Exp1_CMHEF_TGF",
+    "Exp3_CMDEF_NC",
+    "Exp3_CMDEF_TGF",
+    "Exp3_CMHEF_NC",
+#    "Exp3_CMHEF_TGF",
+    "Exp4_CMDEF_NC",
+    "Exp4_CMDEF_TGF",
+    "Exp4_CMHEF_EC_pretreated_TGF",
+    "Exp4_CMHEF_EC_pretreated_TNF",
+    "Exp4_CMHEF_NC",
+    "Exp4_CMHEF_TGF",
+    "Exp4_EC_diseased",
+    "Exp4_EC_healthy"
+  )
+)
+
+preQC <- Create_CellBender_Merged_Seurat(raw_cell_bender_matrix = cell_bender_merged, 
+                                             raw_counts_matrix = cell_ranger_merged, 
+                                             raw_assay_name = "RAW", 
+                                             cell_bender_assay_name = "RNA")
+rm(cell_bender_merged, cell_ranger_merged)
+```
+
+```{r}
+cb_missing <- Read_CellBender_h5_Multi_File(
+  merge = FALSE,
+  data_dir = here::here("data", "Cellbender_output"),
+  custom_name = "_filtered.h5",
+  sample_list = "cellbender_output_Exp3_CMHEF_TGF",
+  sample_names = "Exp3_CMHEF_TGF"
+)
+```
+
+Add metadata: percentage of mitochondrial and ribosomal genes, clinical data
+
+```{r add metadata}
+cn <- Cells(preQC)
+
+preQC$Sample <- dplyr::case_when(
+  grepl("^Exp1_CMHEF_NC", cn) ~ "Exp1_CMHEF_NC",
+  grepl("^Exp1_CMHEF_TGF", cn) ~ "Exp1_CMHEF_TGF",
+  
+  grepl("^Exp3_CMDEF_NC", cn) ~ "Exp3_CMDEF_NC",
+  grepl("^Exp3_CMDEF_TGF", cn) ~ "Exp3_CMDEF_TGF",
+  grepl("^Exp3_CMHEF_NC", cn) ~ "Exp3_CMHEF_NC",
+#  grepl("^Exp3_CMHEF_TGF", cn) ~ "Exp3_CMHEF_TGF",
+  
+  grepl("^Exp4_CMDEF_NC", cn) ~ "Exp4_CMDEF_NC",
+  grepl("^Exp4_CMDEF_TGF", cn) ~ "Exp4_CMDEF_TGF",
+  
+  grepl("^Exp4_CMHEF_EC_pretreated_TGF", cn) ~ "Exp4_CMHEF_EC_pretreated_TGF",
+  grepl("^Exp4_CMHEF_EC_pretreated_TNF", cn) ~ "Exp4_CMHEF_EC_pretreated_TNF",
+  grepl("^Exp4_CMHEF_NC", cn) ~ "Exp4_CMHEF_NC",
+  grepl("^Exp4_CMHEF_TGF", cn) ~ "Exp4_CMHEF_TGF",
+  
+  grepl("^Exp4_EC_diseased", cn) ~ "Exp4_EC_diseased",
+  grepl("^Exp4_EC_healthy", cn) ~ "Exp4_EC_healthy",
+  
+  TRUE ~ NA_character_
+)
+table(preQC$Sample, useNA = "ifany")
+
+preQC[["percent.mt"]] <- PercentageFeatureSet(preQC, pattern = "^MT-")
+preQC[["percent.rp"]] <- PercentageFeatureSet(preQC, pattern = "^RP[SL]")
+```
+
+Check how much Cellbender has affected the dataset
+
+```{r Cellbender, fig.height=4, fig.width=7}
+table(preQC$Sample)
+
+preQC <- Add_CellBender_Diff(seurat_object = preQC, 
+                                 raw_assay_name = "RAW", 
+                                 cell_bender_assay_name = "RNA")
+
+median_stats <- Median_Stats(seurat_object = preQC, 
+                             group_by_var = "orig.ident", 
+                             median_var = c("nCount_Diff", "nFeature_Diff"))
+median_stats
+
+feature_diff <- CellBender_Feature_Diff(seurat_object = preQC, 
+                                        raw_assay = "RAW", 
+                                        cell_bender_assay = "RNA")
+head(feature_diff)
+
+CellBender_Diff_Plot(feature_diff_df = feature_diff)
+```
+
+```{r}
+missing_obj <- CreateSeuratObject(
+  counts = cb_missing$Exp3_CMHEF_TGF,
+  assay = "RNA",
+  project = "Exp3_CMHEF_TGF"
+)
+
+missing_obj$Sample <- "Exp3_CMHEF_TGF"
+missing_obj[["percent.mt"]] <- PercentageFeatureSet(missing_obj, pattern = "^MT-")
+missing_obj[["percent.rp"]] <- PercentageFeatureSet(missing_obj, pattern = "^RP[SL]")
+preQC <- merge(preQC, y = missing_obj)
+preQC@assays$RAW <- NULL
+```
+
+Check quality control parameters
+
+```{r QC_pre_VlnPlots, fig.height=10, fig.width=15}
+p1 <- VlnPlot(preQC, features = "nCount_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(preQC, features = "nFeature_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 <- VlnPlot(preQC, features = "percent.mt", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 <- VlnPlot(preQC, features = "percent.rp", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_VlnPlots <- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_VlnPlots
+```
+
+```{r QC_pre_VlnPlots_zoom, fig.height=10, fig.width=15}
+p1 <- VlnPlot(preQC, features = "nCount_RNA", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(preQC, features = "nFeature_RNA", group.by = "Sample", pt.size = 0, y.max = 6000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 <- VlnPlot(preQC, features = "percent.mt", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 <- VlnPlot(preQC, features = "percent.rp", group.by = "Sample", pt.size = 0, y.max = 20) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_VlnPlots_zoom <- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_VlnPlots_zoom
+```
+
+Doublets detection
+
+```{r}
+preQC_sce <- as.SingleCellExperiment(preQC)
+preQC_sce <- scDblFinder(preQC_sce, samples="Sample", clusters = TRUE)
+table(preQC_sce@colData$scDblFinder.class)
+preQC <- as.Seurat(preQC_sce, counts = "counts", data = "logcounts")
+rm(preQC_sce)
+preQC@meta.data[preQC@meta.data$scDblFinder.class %in% "singlet", "scDblFinder.n"] = paste0("Singlets (n=", table(preQC$scDblFinder.class)[1], ")")
+preQC@meta.data[preQC@meta.data$scDblFinder.class %in% "doublet", "scDblFinder.n"] = paste0("Doublets (n=", table(preQC$scDblFinder.class)[2], ")")
+preQC$scDblFinder.n <- factor(x = preQC$scDblFinder.n, levels = c(rownames(table(preQC$scDblFinder.n))[2], rownames(table(preQC$scDblFinder.n))[1])) 
+```
+
+```{r QC_pre_Doublets, fig.height=4, fig.width=15}
+p1 <- VlnPlot(preQC, features = c("nCount_RNA"), split.by = "scDblFinder.n", group.by = "Sample", pt.size = 0, y.max = 50000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(preQC, features = c("nFeature_RNA"), split.by = "scDblFinder.n", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) 
+
+QC_pre_Doublets <- p1 + p2 + plot_layout(ncol = 2)
+
+QC_pre_Doublets
+```
+
+```{r eval=FALSE}
+qs_save(preQC,
+        file = here::here(output_dir_data, "preQC.qs2"),
+        nthreads = 32
+        )
+```
+
+```{r}
+metadata <- read_excel(here::here("data", "Libraries_MT_LMS_metadata.xlsx"))
+add_metadata <- left_join(preQC[["Sample"]], metadata)
+row.names(add_metadata) <- row.names(preQC[[]])
+preQC <- AddMetaData(preQC, metadata = add_metadata)
+rm(add_metadata)
+rownames(metadata) <- metadata$Sample
+metadata
+table(preQC$Sample)
+table(preQC$Sample, preQC$scDblFinder.class)
+```
+
+Remove doublets
+
+```{r preQC_no_doublets}
+preQC_no_doublets <- subset(x = preQC, subset = scDblFinder.class == "singlet")
+table(preQC_no_doublets@meta.data$scDblFinder.class)
+rm(preQC)
+```
+
+Check quality control parameters after removing doublets
+
+```{r QC_pre_no_doublets_VlnPlots, fig.height=10, fig.width=15}
+p1 <- VlnPlot(preQC_no_doublets, features = "nCount_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(preQC_no_doublets, features = "nFeature_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 <- VlnPlot(preQC_no_doublets, features = "percent.mt", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 <- VlnPlot(preQC_no_doublets, features = "percent.rp", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_no_doublets_VlnPlots <- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_no_doublets_VlnPlots
+```
+
+```{r QC_pre_no_doublets_VlnPlots_zoom, fig.height=10, fig.width=15}
+p1 <- VlnPlot(preQC_no_doublets, features = "nCount_RNA", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(preQC_no_doublets, features = "nFeature_RNA", group.by = "Sample", pt.size = 0, y.max = 6000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 <- VlnPlot(preQC_no_doublets, features = "percent.mt", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 <- VlnPlot(preQC_no_doublets, features = "percent.rp", group.by = "Sample", pt.size = 0, y.max = 20) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_no_doublets_VlnPlots_zoom <- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_pre_no_doublets_VlnPlots_zoom
+```
+
+Filter based on number of counts, features and percentage of mitochondrial genes
+
+```{r}
+postQC <- subset(preQC_no_doublets, subset = 
+                nFeature_RNA > 500 &
+                percent.mt < 2 &
+                nCount_RNA > 1000)
+
+table(postQC$Sample)
+```
+
+Check quality control parameters
+
+```{r QC_post_VlnPlots, fig.height=10, fig.width=15}
+p1 <- VlnPlot(postQC, features = "nCount_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(postQC, features = "nFeature_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 <- VlnPlot(postQC, features = "percent.mt", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 <- VlnPlot(postQC, features = "percent.rp", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_post_VlnPlots <- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_post_VlnPlots
+```
+
+```{r QC_post_VlnPlots_zoom, fig.height=10, fig.width=15}
+p1 <- VlnPlot(postQC, features = "nCount_RNA", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p2 <- VlnPlot(postQC, features = "nFeature_RNA", group.by = "Sample", pt.size = 0, y.max = 6000) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p3 <- VlnPlot(postQC, features = "percent.mt", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+
+p4 <- VlnPlot(postQC, features = "percent.rp", group.by = "Sample", pt.size = 0, y.max = 20) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_post_VlnPlots_zoom <- p1 + p2 + p3 + p4 + plot_layout(ncol = 2)
+
+QC_post_VlnPlots_zoom
+```
+
+
+Normalization and scaling using SCTransform.
+
+```{r SCTransform, message=FALSE, warning=FALSE, echo = TRUE, results= "hide"}
+DefaultAssay(postQC) <- "RNA"
+postQC.list <- SplitObject(postQC, split.by = "Sample")
+for (i in 1:length(postQC.list)) {
+  postQC.list[[i]] <- SCTransform(postQC.list[[i]], 
+                             vst.flavor = "v2", 
+                             vars.to.regress = c("percent.mt"), 
+                             return.only.var.genes = TRUE,
+                             method = "glmGamPoi")
+}
+```
+
+PCA without integration
+
+```{r, eval=FALSE}
+features <- SelectIntegrationFeatures(object.list = postQC.list, nfeatures = 3000)
+not_integrated <- merge(x = postQC.list[[1]], y = postQC.list[2:length(postQC.list)], merge.data=TRUE)
+VariableFeatures(not_integrated) <- features
+not_integrated <- RunPCA(not_integrated)
+```
+
+```{r}
+rm(preQC, preQC_no_doublets, postQC, postQC.list)
+```
+
+```{r eval=FALSE}
+qs_save(not_integrated,
+        file = here::here(output_dir_data, "not_integrated.qs2"),
+        nthreads = 32
+        )
+```
+
+```{r}
+not_integrated <- qs_read(here::here(output_dir_data, "not_integrated.qs2"), nthreads = 32)
+```
+
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(not_integrated, ndims = 50)
+```
+
+Clustering without integration
+
+```{r eval=FALSE}
+options(future.globals.maxSize = Inf)
+
+not_integrated <- RunUMAP(not_integrated, dims = 1:50)
+not_integrated <- FindNeighbors(not_integrated, dims = 1:50)
+not_integrated <- FindClusters(not_integrated, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(not_integrated@meta.data[,grep("SCT_snn_res", colnames(not_integrated@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(not_integrated, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r eval=FALSE}
+qs_save(not_integrated,
+        file = here::here(output_dir_data, "not_integrated.qs2"),
+        nthreads = 32
+        )
+```
+
+Integrate the samples
+
+```{r}
+integrated <- RunHarmony(not_integrated, 
+                     assay.use="SCT", 
+                     group.by.vars = c("Sample"), 
+                     dims.use = 1:50, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )
+```
+
+```{r, eval=FALSE}
+qs_save(integrated,
+        file = here::here(output_dir_data, "integrated.qs2"),
+        nthreads = 32
+        )
+```
+
+```{r}
+integrated <- qs_read(here::here(output_dir_data, "integrated.qs2"), nthreads = 32)
+```
+
+Clustering after integration
+
+```{r eval=FALSE}
+integrated <- RunUMAP(integrated, dims = 1:50, reduction = "harmony")
+integrated <- FindNeighbors(integrated, dims = 1:50, reduction = "harmony")
+integrated <- FindClusters(integrated, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated@meta.data[,grep("SCT_snn_res", colnames(integrated@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+## Only Exp4_NC_H
+
+```{r}
+integrated_exp4nch <- subset(not_integrated, Sample %in% c("Exp4_CMHEF_NC"))
+DefaultAssay(integrated_exp4nch) <- "SCT"
+integrated_exp4nch <- RunPCA(integrated_exp4nch)
+```
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(integrated_exp4nch, ndims = 50)
+```
+
+```{r}
+integrated_exp4nch <- RunUMAP(integrated_exp4nch, dims = 1:50, reduction = "pca")
+integrated_exp4nch <- FindNeighbors(integrated_exp4nch, dims = 1:50, reduction = "pca")
+integrated_exp4nch <- FindClusters(integrated_exp4nch, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_exp4nch@meta.data[,grep("SCT_snn_res", colnames(integrated_exp4nch@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_exp4nch, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r}
+DefaultAssay(integrated_exp4nch) <- "RNA"
+integrated_exp4nch <- NormalizeData(integrated_exp4nch)
+Idents(integrated_exp4nch) <- "SCT_snn_res.0.2"
+Markers_integrated_exp4nch <- FindAllMarkers(integrated_exp4nch, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers_integrated_exp4nch, here::here(output_dir_data, "Markers_all_integrated_exp4nch.csv"))
+Markers_top10_integrated_exp4nch <- as.data.frame(Markers_integrated_exp4nch %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10_integrated_exp4nch, here::here(output_dir_data, "Markers_all_top10_integrated_exp4nch.csv"))
+Markers_top3_integrated_exp4nch <- as.data.frame(Markers_integrated_exp4nch %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3_integrated_exp4nch, here::here(output_dir_data, "Markers_all_top3integrated_exp4nch.csv"))
+```
+
+```{r, fig.width=15, fig.height=12}
+VlnPlot(integrated_exp4nch, features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"), ncol = 2, pt.size = 0) + theme(axis.title.x = element_blank())
+```
+
+```{r, fig.width=5, fig.height=4}
+DefaultAssay(integrated_exp4nch) <- "RNA"
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+integrated_exp4nch <- CellCycleScoring(integrated_exp4nch, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated_exp4nch, reduction = "umap", shuffle = T,
+        group.by = "Phase")
+```
+
+```{r}
+integrated_exp4nch@meta.data[integrated_exp4nch@meta.data$SCT_snn_res.0.2 %in% c("0"), "cell_type"] = "Cm1"
+integrated_exp4nch@meta.data[integrated_exp4nch@meta.data$SCT_snn_res.0.2 %in% c("1"), "cell_type"] = "Ec1"
+integrated_exp4nch@meta.data[integrated_exp4nch@meta.data$SCT_snn_res.0.2 %in% c("2"), "cell_type"] = "Fb"
+integrated_exp4nch@meta.data[integrated_exp4nch@meta.data$SCT_snn_res.0.2 %in% c("3"), "cell_type"] = "Cm2"
+integrated_exp4nch@meta.data[integrated_exp4nch@meta.data$SCT_snn_res.0.2 %in% c("4"), "cell_type"] = "Ec2"
+integrated_exp4nch@meta.data[integrated_exp4nch@meta.data$SCT_snn_res.0.2 %in% c("5"), "cell_type"] = "Prol"
+integrated_exp4nch$cell_type <- factor(integrated_exp4nch$cell_type, levels = c("Cm1",
+                                                                              "Ec1",
+                                                                              "Fb",
+                                                                              "Cm2",
+                                                                              "Ec2",
+                                                                              "Prol"
+                                                                              ))
+Idents(integrated_exp4nch) <- integrated_exp4nch$cell_type
+```
+
+```{r, fig.width=12, fig.height=9}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9,"RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+integrated_exp4nch <- ScaleData(integrated_exp4nch)
+
+Heatmap <- DoHeatmap(integrated_exp4nch, label = TRUE, draw.line = F, features = Markers_top10_integrated_exp4nch$gene, assay = "RNA") + 
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 12), 
+        axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.2, 0, 0, 0), "inches")) +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 4)) + guides(color = "none") 
+Heatmap
+```
+
+```{r, fig.width=6.5, fig.height=6}
+p <- DimPlot(integrated_exp4nch, group.by = "cell_type", reduction = "umap", label = F) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = "bold"), axis.title = element_text(size = 18, face = "bold")) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = "cell_type", fontface = "bold", size = 5.5, repel = T)
+```
+
+```{r, fig.width=6, fig.height=7}
+DotPlot(integrated_exp4nch, assay = "SCT", features = rev(Markers_top3_integrated_exp4nch$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_exp4nch, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4)
+```
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_exp4nch$cell_type, integrated_exp4nch$Sample, transform="logit")
+
+par(mar = c(23, 5, 1, 15), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.5, 0.1), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+## Only Exp4_NC
+
+```{r}
+integrated_exp4nc <- subset(not_integrated, Sample %in% c("Exp4_CMHEF_NC", "Exp4_CMDEF_NC"))
+DefaultAssay(integrated_exp4nc) <- "SCT"
+integrated_exp4nc <- SplitObject(integrated_exp4nc, split.by = "Sample")
+```
+
+```{r}
+features <- SelectIntegrationFeatures(object.list = integrated_exp4nc, nfeatures = 3000)
+integrated_exp4nc <- merge(x = integrated_exp4nc[[1]], y = integrated_exp4nc[2:length(integrated_exp4nc)], merge.data=TRUE)
+VariableFeatures(integrated_exp4nc) <- features
+integrated_exp4nc <- RunPCA(integrated_exp4nc)
+```
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(integrated_exp4nc, ndims = 50)
+```
+
+```{r}
+integrated_exp4nc <- RunHarmony(integrated_exp4nc, 
+                     assay.use="SCT", 
+                     group.by.vars = c("Sample"), 
+                     dims.use = 1:50, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )
+```
+
+```{r}
+integrated_exp4nc <- RunUMAP(integrated_exp4nc, dims = 1:50, reduction = "harmony")
+integrated_exp4nc <- FindNeighbors(integrated_exp4nc, dims = 1:50, reduction = "harmony")
+integrated_exp4nc <- FindClusters(integrated_exp4nc, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_exp4nc@meta.data[,grep("SCT_snn_res", colnames(integrated_exp4nc@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_exp4nc, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r}
+DefaultAssay(integrated_exp4nc) <- "RNA"
+integrated_exp4nc <- NormalizeData(integrated_exp4nc)
+Idents(integrated_exp4nc) <- "SCT_snn_res.0.2"
+Markers_integrated_exp4nc <- FindAllMarkers(integrated_exp4nc, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers_integrated_exp4nc, here::here(output_dir_data, "Markers_all_integrated_exp4nc.csv"))
+Markers_top10_integrated_exp4nc <- as.data.frame(Markers_integrated_exp4nc %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10_integrated_exp4nc, here::here(output_dir_data, "Markers_all_top10_integrated_exp4nc.csv"))
+Markers_top3_integrated_exp4nc <- as.data.frame(Markers_integrated_exp4nc %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3_integrated_exp4nc, here::here(output_dir_data, "Markers_all_top3integrated_exp4nc.csv"))
+```
+
+```{r, fig.width=15, fig.height=12}
+VlnPlot(integrated_exp4nc, features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"), ncol = 2, pt.size = 0) + theme(axis.title.x = element_blank())
+```
+
+```{r, fig.width=5, fig.height=4}
+DefaultAssay(integrated_exp4nc) <- "RNA"
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+integrated_exp4nc <- CellCycleScoring(integrated_exp4nc, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated_exp4nc, reduction = "umap", shuffle = T,
+        group.by = "Phase")
+```
+
+```{r}
+integrated_exp4nc@meta.data[integrated_exp4nc@meta.data$SCT_snn_res.0.2 %in% c("0"), "cell_type"] = "Cm1"
+integrated_exp4nc@meta.data[integrated_exp4nc@meta.data$SCT_snn_res.0.2 %in% c("1"), "cell_type"] = "Fb1"
+integrated_exp4nc@meta.data[integrated_exp4nc@meta.data$SCT_snn_res.0.2 %in% c("2"), "cell_type"] = "Cm2"
+integrated_exp4nc@meta.data[integrated_exp4nc@meta.data$SCT_snn_res.0.2 %in% c("3"), "cell_type"] = "Ec"
+integrated_exp4nc@meta.data[integrated_exp4nc@meta.data$SCT_snn_res.0.2 %in% c("4"), "cell_type"] = "Prol"
+integrated_exp4nc@meta.data[integrated_exp4nc@meta.data$SCT_snn_res.0.2 %in% c("5"), "cell_type"] = "Ec2"
+integrated_exp4nc$cell_type <- factor(integrated_exp4nc$cell_type, levels = c("Cm1",
+                                                                              "Fb1",
+                                                                              "Cm2",
+                                                                              "Ec",
+                                                                              "Prol",
+                                                                              "Ec2"
+                                                                              ))
+Idents(integrated_exp4nc) <- integrated_exp4nc$cell_type
+```
+
+```{r, fig.width=12, fig.height=9}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9,"RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+integrated_exp4nc <- ScaleData(integrated_exp4nc)
+
+Heatmap <- DoHeatmap(subset(integrated_exp4nc, cells = sample(colnames(integrated_exp4nc), 7164)), label = TRUE, draw.line = F, features = Markers_top10_integrated_exp4nc$gene, assay = "RNA") + 
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 12), 
+        axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.2, 0, 0, 0), "inches")) +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 4)) + guides(color = "none") 
+Heatmap
+```
+
+```{r, fig.width=6.5, fig.height=6}
+p <- DimPlot(integrated_exp4nc, group.by = "cell_type", reduction = "umap", label = F) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = "bold"), axis.title = element_text(size = 18, face = "bold")) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = "cell_type", fontface = "bold", size = 5.5, repel = T)
+```
+
+```{r, fig.width=6, fig.height=7}
+DotPlot(integrated_exp4nc, assay = "SCT", features = rev(Markers_top3_integrated_exp4nc$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_exp4nc, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4)
+```
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_exp4nc$cell_type, integrated_exp4nc$Sample, transform="logit")
+
+par(mar = c(23, 5, 1, 15), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.5, 0.1), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+
+## Only microtissues
+
+```{r}
+integrated_mt <- subset(not_integrated, Type == "Microtissues")
+DefaultAssay(integrated_mt) <- "SCT"
+integrated_mt <- SplitObject(integrated_mt, split.by = "Sample")
+```
+
+```{r}
+features <- SelectIntegrationFeatures(object.list = integrated_mt, nfeatures = 3000)
+integrated_mt <- merge(x = integrated_mt[[1]], y = integrated_mt[2:length(integrated_mt)], merge.data=TRUE)
+VariableFeatures(integrated_mt) <- features
+integrated_mt <- RunPCA(integrated_mt)
+```
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(integrated_mt, ndims = 50)
+```
+
+```{r}
+integrated_mt <- RunUMAP(integrated_mt, dims = 1:50)
+integrated_mt <- FindNeighbors(integrated_mt, dims = 1:50)
+integrated_mt <- FindClusters(integrated_mt, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_mt@meta.data[,grep("SCT_snn_res", colnames(integrated_mt@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_mt, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r}
+integrated_mt <- RunHarmony(integrated_mt, 
+                     assay.use="SCT", 
+                     group.by.vars = c("Sample"), 
+                     dims.use = 1:50, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )
+```
+
+```{r}
+integrated_mt <- RunUMAP(integrated_mt, dims = 1:50, reduction = "harmony")
+integrated_mt <- FindNeighbors(integrated_mt, dims = 1:50, reduction = "harmony")
+integrated_mt <- FindClusters(integrated_mt, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_mt@meta.data[,grep("SCT_snn_res", colnames(integrated_mt@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_mt, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+Find the markers that characterize each cell population
+
+```{r}
+DefaultAssay(integrated_mt) <- "RNA"
+integrated_mt <- NormalizeData(integrated_mt)
+Idents(integrated_mt) <- "SCT_snn_res.0.3"
+Markers <- FindAllMarkers(integrated_mt, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers, here::here(output_dir_data, "Markers_all_mt.csv"))
+Markers_top10 <- as.data.frame(Markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10, here::here(output_dir_data, "Markers_top10_mt.csv"))
+Markers_top3 <- as.data.frame(Markers %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3, here::here(output_dir_data, "Markers_top3_mt.csv"))
+
+```
+
+
+```{r, fig.width=15, fig.height=12}
+VlnPlot(integrated_mt, features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"), ncol = 2, pt.size = 0) + theme(axis.title.x = element_blank())
+```
+
+```{r, fig.width=5, fig.height=4}
+DefaultAssay(integrated_mt) <- "RNA"
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+integrated_mt <- CellCycleScoring(integrated_mt, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated_mt, reduction = "umap", shuffle = T,
+        group.by = "Phase")
+```
+
+
+```{r}
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("0"), "cell_type"] = "Cm1"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("1"), "cell_type"] = "Fb1"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("2"), "cell_type"] = "Cm2"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("3"), "cell_type"] = "Prol"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("4"), "cell_type"] = "Ec"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("5"), "cell_type"] = "Cm3"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("6"), "cell_type"] = "Fb2"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("7"), "cell_type"] = "Fb3"
+integrated_mt@meta.data[integrated_mt@meta.data$SCT_snn_res.0.3 %in% c("8"), "cell_type"] = "Cm4"
+integrated_mt$cell_type <- factor(integrated_mt$cell_type, levels = c("Cm1", 
+                                                                        "Fb1",
+                                                                        "Cm2",
+                                                                        "Prol",
+                                                                        "Ec",
+                                                                        "Cm3",
+                                                                      "Fb2",
+                                                                      "Fb3",
+                                                                      "Cm4"))
+Idents(integrated_mt) <- integrated_mt$cell_type
+```
+
+```{r, fig.width=12, fig.height=9}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9,"RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+integrated_mt <- ScaleData(integrated_mt)
+Heatmap <- DoHeatmap(subset(integrated_mt, cells = sample(colnames(integrated_mt), 20000)), label = TRUE, draw.line = F, features = Markers_top10$gene, assay = "RNA") + 
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 12), 
+        axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.2, 0, 0, 0), "inches")) +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 4)) + guides(color = "none") 
+Heatmap
+```
+
+```{r, fig.width=6.5, fig.height=6}
+p <- DimPlot(integrated_mt, group.by = "cell_type", reduction = "umap", label = F) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = "bold"), axis.title = element_text(size = 18, face = "bold")) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = "cell_type", fontface = "bold", size = 5.5, repel = T)
+```
+
+```{r, fig.width=6, fig.height=7}
+DotPlot(integrated_mt, assay = "SCT", features = rev(Markers_top3$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r, fig.width=16, fig.height=4}
+FeaturePlot_scCustom(integrated_mt, features = c("ACTA2", "POSTN", "COL1A1", "VIM"), num_columns = 4)
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_mt, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4)
+```
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_mt$cell_type, integrated_mt$Sample, transform="logit")
+
+par(mar = c(23, 5, 1, 10), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.2, 0.1), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_mt$cell_type, integrated_mt$Treatment, transform="logit")
+
+par(mar = c(23, 5, 1, 10), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.2, 0.1), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+## Only 2D EC
+
+```{r}
+integrated_ec <- subset(not_integrated, Type == "Endothelial cells")
+DefaultAssay(integrated_ec) <- "SCT"
+integrated_ec <- SplitObject(integrated_ec, split.by = "Sample")
+```
+
+```{r}
+features <- SelectIntegrationFeatures(object.list = integrated_ec, nfeatures = 1000)
+integrated_ec <- merge(x = integrated_ec[[1]], y = integrated_ec[2:length(integrated_ec)], merge.data=TRUE)
+VariableFeatures(integrated_ec) <- features
+integrated_ec <- RunPCA(integrated_ec)
+```
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(integrated_ec, ndims = 50)
+```
+
+```{r}
+integrated_ec <- RunHarmony(integrated_ec, 
+                     assay.use="SCT", 
+                     group.by.vars = c("Sample"), 
+                     dims.use = 1:30, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )
+```
+
+```{r}
+integrated_ec <- RunUMAP(integrated_ec, dims = 1:30, reduction = "harmony")
+integrated_ec <- FindNeighbors(integrated_ec, dims = 1:30, reduction = "harmony")
+integrated_ec <- FindClusters(integrated_ec, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_ec@meta.data[,grep("SCT_snn_res", colnames(integrated_ec@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_ec, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r}
+DefaultAssay(integrated_ec) <- "RNA"
+integrated_ec <- NormalizeData(integrated_ec)
+Idents(integrated_ec) <- "SCT_snn_res.0.2"
+Markers_integrated_ec <- FindAllMarkers(integrated_ec, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers_integrated_ec, here::here(output_dir_data, "Markers_all_integrated_ec.csv"))
+Markers_top10_integrated_ec <- as.data.frame(Markers_integrated_ec %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10_integrated_ec, here::here(output_dir_data, "Markers_all_top10_integrated_ec.csv"))
+Markers_top3_integrated_ec <- as.data.frame(Markers_integrated_ec %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3_integrated_ec, here::here(output_dir_data, "Markers_all_top3integrated_ec.csv"))
+
+```
+
+```{r, fig.width=15, fig.height=12}
+VlnPlot(integrated_ec, features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"), ncol = 2, pt.size = 0) + theme(axis.title.x = element_blank())
+```
+
+```{r, fig.width=5, fig.height=4}
+DefaultAssay(integrated_ec) <- "RNA"
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+integrated_ec <- CellCycleScoring(integrated_ec, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated_ec, reduction = "umap", shuffle = T,
+        group.by = "Phase")
+```
+
+```{r}
+integrated_ec@meta.data[integrated_ec@meta.data$SCT_snn_res.0.2 %in% c("0"), "cell_type"] = "Ec1"
+integrated_ec@meta.data[integrated_ec@meta.data$SCT_snn_res.0.2 %in% c("1"), "cell_type"] = "Ec_prol"
+integrated_ec@meta.data[integrated_ec@meta.data$SCT_snn_res.0.2 %in% c("2"), "cell_type"] = "Ec_2"
+integrated_ec@meta.data[integrated_ec@meta.data$SCT_snn_res.0.2 %in% c("3"), "cell_type"] = "Ec_3"
+integrated_ec@meta.data[integrated_ec@meta.data$SCT_snn_res.0.2 %in% c("4"), "cell_type"] = "Fibroblasts"
+integrated_ec@meta.data[integrated_ec@meta.data$SCT_snn_res.0.2 %in% c("5"), "cell_type"] = "Cardioyocytes"
+integrated_ec$cell_type <- factor(integrated_ec$cell_type, levels = c("Ec1",
+                                                                      "Ec_prol",
+                                                                      "Ec_2",
+                                                                      "Ec_3",
+                                                                      "Fibroblasts",
+                                                                      "Cardioyocytes"
+                                                                      ))
+Idents(integrated_ec) <- integrated_ec$cell_type
+```
+
+```{r, fig.width=12, fig.height=9}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9,"RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+integrated_ec <- ScaleData(integrated_ec)
+
+Heatmap <- DoHeatmap(subset(integrated_ec, cells = sample(colnames(integrated_ec), 7164)), label = TRUE, draw.line = F, features = Markers_top10_integrated_ec$gene, assay = "RNA") + 
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 12), 
+        axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.2, 0, 0, 0), "inches")) +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 4)) + guides(color = "none") 
+Heatmap
+```
+
+```{r, fig.width=6.5, fig.height=6}
+p <- DimPlot(integrated_ec, group.by = "cell_type", reduction = "umap", label = F) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = "bold"), axis.title = element_text(size = 18, face = "bold")) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = "cell_type", fontface = "bold", size = 5.5, repel = T)
+```
+
+```{r, fig.width=6, fig.height=7}
+DotPlot(integrated_ec, assay = "SCT", features = rev(Markers_top3_integrated_ec$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_ec, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4)
+```
+
+```{r, fig.width=16, fig.height=12}
+FeaturePlot_scCustom(integrated_ec, features = c("VWF", "PECAM1", "RYR2", "COL1A1", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4, order = F)
+```
+
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_ec$cell_type, integrated_ec$Sample, transform="logit")
+
+par(mar = c(23, 5, 1, 15), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.5, 0.1), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+
+## Exp4 2D and 3d endothelial cells
+
+```{r}
+integrated_ec_mt <- merge(subset(integrated_ec, cell_type %in% c("Ec1", "Ec_prol", "Ec_2", "Ec_3")),
+                          subset(integrated_exp4nc, cell_type %in% c("Ec", "Ec2"))
+)
+DefaultAssay(integrated_ec_mt) <- "SCT"
+integrated_ec_mt <- SplitObject(integrated_ec_mt, split.by = "Sample")
+```
+
+```{r}
+for (i in 1:length(integrated_ec_mt)) {
+  integrated_ec_mt[[i]] <- SCTransform(integrated_ec_mt[[i]], 
+                             vst.flavor = "v2", 
+                             vars.to.regress = c("percent.mt"), 
+                             return.only.var.genes = TRUE,
+                             method = "glmGamPoi")
+}
+
+features <- SelectIntegrationFeatures(object.list = integrated_ec_mt, nfeatures = 1000)
+integrated_ec_mt <- merge(x = integrated_ec_mt[[1]], y = integrated_ec_mt[2:length(integrated_ec_mt)], merge.data=TRUE)
+VariableFeatures(integrated_ec_mt) <- features
+integrated_ec_mt <- RunPCA(integrated_ec_mt)
+```
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(integrated_ec_mt, ndims = 50)
+```
+
+```{r}
+integrated_ec_mt <- RunHarmony(integrated_ec_mt, 
+                     assay.use="SCT", 
+                     group.by.vars = c("Sample"), 
+                     dims.use = 1:30, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )
+```
+
+```{r}
+integrated_ec_mt <- RunUMAP(integrated_ec_mt, dims = 1:30, reduction = "harmony")
+integrated_ec_mt <- FindNeighbors(integrated_ec_mt, dims = 1:30, reduction = "harmony")
+integrated_ec_mt <- FindClusters(integrated_ec_mt, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_ec_mt@meta.data[,grep("SCT_snn_res", colnames(integrated_ec_mt@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_ec_mt, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r}
+DefaultAssay(integrated_ec_mt) <- "RNA"
+integrated_ec_mt <- NormalizeData(integrated_ec_mt)
+Idents(integrated_ec_mt) <- "SCT_snn_res.0.2"
+Markers_integrated_ec_mt <- FindAllMarkers(integrated_ec_mt, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers_integrated_ec_mt, here::here(output_dir_data, "Markers_all_integrated_ec_mt.csv"))
+Markers_top10_integrated_ec_mt <- as.data.frame(Markers_integrated_ec_mt %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10_integrated_ec_mt, here::here(output_dir_data, "Markers_all_top10_integrated_ec_mt.csv"))
+Markers_top3_integrated_ec_mt <- as.data.frame(Markers_integrated_ec_mt %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3_integrated_ec_mt, here::here(output_dir_data, "Markers_all_top3integrated_ec_mt.csv"))
+
+```
+
+```{r, fig.width=15, fig.height=12}
+VlnPlot(integrated_ec_mt, features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"), ncol = 2, pt.size = 0) + theme(axis.title.x = element_blank())
+```
+
+```{r, fig.width=5, fig.height=4}
+DefaultAssay(integrated_ec_mt) <- "RNA"
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+integrated_ec_mt <- CellCycleScoring(integrated_ec_mt, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated_ec_mt, reduction = "umap", shuffle = T,
+        group.by = "Phase")
+```
+
+```{r}
+integrated_ec_mt@meta.data[integrated_ec_mt@meta.data$SCT_snn_res.0.2 %in% c("0"), "cell_type"] = "Ec1"
+integrated_ec_mt@meta.data[integrated_ec_mt@meta.data$SCT_snn_res.0.2 %in% c("1"), "cell_type"] = "Ec_prol"
+integrated_ec_mt@meta.data[integrated_ec_mt@meta.data$SCT_snn_res.0.2 %in% c("2"), "cell_type"] = "Ec_2"
+integrated_ec_mt@meta.data[integrated_ec_mt@meta.data$SCT_snn_res.0.2 %in% c("3"), "cell_type"] = "Ec_3"
+integrated_ec_mt@meta.data[integrated_ec_mt@meta.data$SCT_snn_res.0.2 %in% c("4"), "cell_type"] = "Doublets"
+integrated_ec_mt$cell_type <- factor(integrated_ec_mt$cell_type, levels = c("Ec1",
+                                                                      "Ec_prol",
+                                                                      "Ec_2",
+                                                                      "Ec_3",
+                                                                      "Doublets"
+                                                                      ))
+Idents(integrated_ec_mt) <- integrated_ec_mt$cell_type
+```
+
+```{r, fig.width=12, fig.height=9}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9,"RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+integrated_ec_mt <- ScaleData(integrated_ec_mt)
+
+Heatmap <- DoHeatmap(subset(integrated_ec_mt, cells = sample(colnames(integrated_ec_mt), 7164)), label = TRUE, draw.line = F, features = Markers_top10_integrated_ec_mt$gene, assay = "RNA") + 
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 12), 
+        axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.2, 0, 0, 0), "inches")) +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 4)) + guides(color = "none") 
+Heatmap
+```
+
+```{r, fig.width=6.5, fig.height=6}
+p <- DimPlot(integrated_ec_mt, group.by = "cell_type", reduction = "umap", label = F) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = "bold"), axis.title = element_text(size = 18, face = "bold")) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = "cell_type", fontface = "bold", size = 5.5, repel = T)
+```
+
+```{r, fig.width=6, fig.height=7}
+DotPlot(integrated_ec_mt, assay = "SCT", features = rev(Markers_top3_integrated_ec_mt$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_ec_mt, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4)
+```
+
+```{r, fig.width=16, fig.height=12}
+FeaturePlot_scCustom(integrated_ec_mt, features = c("VWF", "PECAM1", "RYR2", "COL1A1", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4, order = F)
+```
+
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_ec_mt$cell_type, integrated_ec_mt$Sample, transform="logit")
+
+par(mar = c(23, 5, 1, 15), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.5, 0.1), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+```{r}
+integrated_ec_mt_de <- subset(integrated_ec_mt, cell_type %in% c("Ec1", "Ec_prol", "Ec_2", "Ec_3"))
+Idents(integrated_ec_mt_de) <- "Type"
+
+Diff_exp_2d_3d <- FindMarkers(
+  integrated_ec_mt_de,
+  ident.1 = "Endothelial cells",
+  ident.2 = "Microtissues",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
+)
+Diff_exp_2d_3d$p_val_adj[Diff_exp_2d_3d$p_val_adj == 0] <- 1e-300
+```
+
+```{r}
+Diff_exp_2d_3d$gene <- rownames(Diff_exp_2d_3d)
+Diff_exp_2d_3d <- Diff_exp_2d_3d %>%
+  mutate(
+    gene = rownames(.),
+    sig = case_when(
+      p_val_adj < 0.05 & avg_log2FC > 0.25 ~ "Up in 2D EC",
+      p_val_adj < 0.05 & avg_log2FC < -0.25 ~ "Up in Microtissue",
+      TRUE ~ "NS"
+    )
+  )
+top_genes <- Diff_exp_2d_3d %>%
+  filter(p_val_adj < 0.01) %>%
+  arrange(p_val_adj) %>%
+  head(15)
+```
+
+
+```{r}
+library(ggrepel)
+ggplot(Diff_exp_2d_3d, aes(avg_log2FC, -log10(p_val_adj), color = sig)) +
+  geom_point(size = 1.5) +
+  geom_text_repel(
+    data = top_genes,
+    aes(label = gene),
+    size = 3
+  ) +
+  scale_color_manual(values = c(
+    "Up in 2D EC" = "firebrick",
+    "Up in Microtissue" = "steelblue",
+    "NS" = "grey70"
+  )) +
+  theme_classic()
+```
+
+
+## Exp4 pretreatment
+
+```{r}
+integrated_pre <- subset(integrated_mt, Sample %in% c("Exp4_CMHEF_NC", "Exp4_CMHEF_EC_pretreated_TNF", "Exp4_CMHEF_EC_pretreated_TGF"))
+
+integrated_pre <- subset(integrated_pre, cell_type %in% c("Ec"))
+
+DefaultAssay(integrated_pre) <- "SCT"
+integrated_pre <- SplitObject(integrated_pre, split.by = "Sample")
+```
+
+```{r}
+for (i in 1:length(integrated_pre)) {
+  integrated_pre[[i]] <- SCTransform(integrated_pre[[i]], 
+                             vst.flavor = "v2", 
+                             vars.to.regress = c("percent.mt"), 
+                             return.only.var.genes = TRUE,
+                             method = "glmGamPoi")
+}
+
+features <- SelectIntegrationFeatures(object.list = integrated_pre, nfeatures = 1000)
+integrated_pre <- merge(x = integrated_pre[[1]], y = integrated_pre[2:length(integrated_pre)], merge.data=TRUE)
+VariableFeatures(integrated_pre) <- features
+integrated_pre <- RunPCA(integrated_pre)
+```
+
+```{r, fig.width=4, fig.height=4}
+ElbowPlot(integrated_pre, ndims = 50)
+```
+
+```{r}
+integrated_pre <- RunHarmony(integrated_pre, 
+                     assay.use="SCT", 
+                     group.by.vars = c("Sample"), 
+                     dims.use = 1:30, 
+                     plot_convergence=TRUE, 
+                     .options = harmony_options(
+                       max.iter.cluster = 100,
+                       )
+                     )
+```
+
+```{r}
+integrated_pre <- RunUMAP(integrated_pre, dims = 1:30, reduction = "harmony")
+integrated_pre <- FindNeighbors(integrated_pre, dims = 1:30, reduction = "harmony")
+integrated_pre <- FindClusters(integrated_pre, resolution = seq(0.1, 0.8, by=0.1))
+```
+
+```{r, fig.width=6, fig.height=9}
+clustree::clustree(integrated_pre@meta.data[,grep("SCT_snn_res", colnames(integrated_pre@meta.data))],
+                   prefix = "SCT_snn_res.")
+```
+
+```{r, fig.width=30, fig.height=10}
+DimPlot(integrated_pre, reduction = "umap", shuffle = T,
+        group.by = c("SCT_snn_res.0.2", "SCT_snn_res.0.3", "SCT_snn_res.0.4", "Sample", "Experiment", "Type", "Treatment", "Disease"), ncol = 4)
+```
+
+```{r}
+DefaultAssay(integrated_pre) <- "RNA"
+integrated_pre <- NormalizeData(integrated_pre)
+Idents(integrated_pre) <- "SCT_snn_res.0.2"
+Markers_integrated_pre <- FindAllMarkers(integrated_pre, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 0.5)
+write.csv(Markers_integrated_pre, here::here(output_dir_data, "Markers_all_integrated_pre.csv"))
+Markers_top10_integrated_pre <- as.data.frame(Markers_integrated_pre %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10_integrated_pre, here::here(output_dir_data, "Markers_all_top10_integrated_pre.csv"))
+Markers_top3_integrated_pre <- as.data.frame(Markers_integrated_pre %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3_integrated_pre, here::here(output_dir_data, "Markers_all_top3integrated_pre.csv"))
+
+```
+
+```{r, fig.width=15, fig.height=12}
+VlnPlot(integrated_pre, features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"), ncol = 2, pt.size = 0) + theme(axis.title.x = element_blank())
+```
+
+```{r, fig.width=5, fig.height=4}
+DefaultAssay(integrated_pre) <- "RNA"
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+integrated_pre <- CellCycleScoring(integrated_pre, s.features = s.genes, g2m.features = g2m.genes)
+DimPlot(integrated_pre, reduction = "umap", shuffle = T,
+        group.by = "Phase")
+```
+
+```{r}
+integrated_pre@meta.data[integrated_pre@meta.data$SCT_snn_res.0.2 %in% c("0"), "cell_type"] = "Ec1"
+integrated_pre@meta.data[integrated_pre@meta.data$SCT_snn_res.0.2 %in% c("1"), "cell_type"] = "Ec2"
+integrated_pre@meta.data[integrated_pre@meta.data$SCT_snn_res.0.2 %in% c("2"), "cell_type"] = "Contamination_fb"
+integrated_pre@meta.data[integrated_pre@meta.data$SCT_snn_res.0.2 %in% c("3"), "cell_type"] = "Contamination_cm"
+integrated_pre@meta.data[integrated_pre@meta.data$SCT_snn_res.0.2 %in% c("4"), "cell_type"] = "Ec3"
+integrated_pre@meta.data[integrated_pre@meta.data$SCT_snn_res.0.2 %in% c("5"), "cell_type"] = "Ec4"
+integrated_pre$cell_type <- factor(integrated_pre$cell_type, levels = c("Ec1",
+                                                                      "Ec2",
+                                                                      "Contamination_fb",
+                                                                      "Contamination_cm",
+                                                                      "Ec3",
+                                                                      "Ec4"
+                                                                      ))
+Idents(integrated_pre) <- integrated_pre$cell_type
+```
+
+```{r, fig.width=12, fig.height=9}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9,"RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+integrated_pre <- ScaleData(integrated_pre)
+
+Heatmap <- DoHeatmap(integrated_pre, label = TRUE, draw.line = F, features = Markers_top10_integrated_pre$gene, assay = "RNA") + 
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 12), 
+        axis.text.y = element_text(size = 8)) +
+  theme(plot.margin = unit(c(0.2, 0, 0, 0), "inches")) +
+  guides(fill = guide_colorbar(barwidth = 1, barheight = 4)) + guides(color = "none") 
+Heatmap
+```
+
+```{r, fig.width=6.5, fig.height=6}
+p <- DimPlot(integrated_pre, group.by = "cell_type", reduction = "umap", label = F) + 
+  NoLegend() + 
+  theme(axis.text=element_text(size=14, face = "bold"), axis.title = element_text(size = 18, face = "bold")) + 
+  theme(plot.title = element_blank())
+LabelClusters(p, id = "cell_type", fontface = "bold", size = 5.5, repel = T)
+```
+
+```{r, fig.width=6, fig.height=7}
+DotPlot(integrated_pre, assay = "SCT", features = rev(Markers_top3_integrated_pre$gene), dot.scale = 5, cluster.idents = FALSE) +
+  RotatedAxis() +
+  coord_flip() +
+  theme(axis.title = element_blank(), axis.text.x = element_text(size = 14), axis.text.y = element_text(size = 13), legend.text = element_text(size = 9), legend.title = element_text(size = 11), plot.margin = unit(c(0, 0, 0, 0.1), 
+                           "inches"))
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_pre, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4)
+```
+
+```{r, fig.width=16, fig.height=16}
+FeaturePlot_scCustom(integrated_pre, features = c("VWF", "PECAM1", "RYR2", "TTN", "COL1A1", "COL1A2", "DCN", "PDGFRA", "KDR", "CDH5", "ESAM", "CD34", "nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp"), num_columns = 4, order=F)
+```
+
+
+```{r, fig.height=9, fig.width=9, message=FALSE}
+color_palette_all <- c("#F8766D", "#00C1AB", "#24B700", "#E18A00", "#00ACFC", "#D575FE", "#BE9C00", "#00BE70", 
+                   "#8CAB00", "#00BBDA", "#FF65AC", "#8B93FF", "#EA8331")
+color_palette <- c("#F8766D", "#24B700", "#00ACFC", "#E18A00", "#D575FE", "#8B93FF", "#BE9C00", "#00BE70", "#FF65AC")
+
+props <- getTransformedProps(integrated_pre$cell_type, integrated_pre$Sample, transform="logit")
+
+par(mar = c(23, 5, 1, 15), xpd = TRUE)
+barplot(props$Proportions, legend = FALSE, ylab = "Proportions", col = color_palette, 
+        cex.names = 1.6, las = 2, font.lab = 2, font.axis = 2, cex.axis = 1, cex.lab = 1.6)
+legend("topright", inset = c(-0.6, 0.2), legend = rownames(props$Proportions), fill = color_palette, bty = "n", cex = 1.6)
+```
+
+```{r}
+integrated_pre_de <- subset(integrated_pre, cell_type %in% c("Ec1", "Ec_2", "Ec_3", "Ec_4"))
+Idents(integrated_pre_de) <- "Treatment"
+
+Diff_exp_2d_3d <- FindMarkers(
+  integrated_pre_de,
+  ident.1 = "TNF_pretreatment",
+  ident.2 = "Untreated",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
+)
+Diff_exp_2d_3d$p_val_adj[Diff_exp_2d_3d$p_val_adj == 0] <- 1e-300
+```
+
+```{r}
+Diff_exp_2d_3d$gene <- rownames(Diff_exp_2d_3d)
+Diff_exp_2d_3d <- Diff_exp_2d_3d %>%
+  mutate(
+    gene = rownames(.),
+    sig = case_when(
+      p_val_adj < 0.05 & avg_log2FC > 0.25 ~ "Up in TNF_pretreatment",
+      p_val_adj < 0.05 & avg_log2FC < -0.25 ~ "Up in Untreated",
+      TRUE ~ "NS"
+    )
+  )
+top_genes <- Diff_exp_2d_3d %>%
+  filter(p_val_adj < 0.01) %>%
+  arrange(p_val_adj) %>%
+  head(15)
+```
+
+
+```{r}
+library(ggrepel)
+ggplot(Diff_exp_2d_3d, aes(avg_log2FC, -log10(p_val_adj), color = sig)) +
+  geom_point(size = 1.5) +
+  geom_text_repel(
+    data = top_genes,
+    aes(label = gene),
+    size = 3
+  ) +
+  scale_color_manual(values = c(
+    "Up in TNF_pretreatment" = "firebrick",
+    "Up in Untreated" = "steelblue",
+    "NS" = "grey70"
+  )) +
+  theme_classic()
+```
+
+```{r}
+Diff_exp_2d_3d <- FindMarkers(
+  integrated_pre_de,
+  ident.1 = "TGFb_pretreatment",
+  ident.2 = "Untreated",
+  logfc.threshold = 0.25,
+  min.pct = 0.1
+)
+Diff_exp_2d_3d$p_val_adj[Diff_exp_2d_3d$p_val_adj == 0] <- 1e-300
+```
+
+```{r}
+Diff_exp_2d_3d$gene <- rownames(Diff_exp_2d_3d)
+Diff_exp_2d_3d <- Diff_exp_2d_3d %>%
+  mutate(
+    gene = rownames(.),
+    sig = case_when(
+      p_val_adj < 0.05 & avg_log2FC > 0.25 ~ "Up in TGFb_pretreatment",
+      p_val_adj < 0.05 & avg_log2FC < -0.25 ~ "Up in Untreated",
+      TRUE ~ "NS"
+    )
+  )
+top_genes <- Diff_exp_2d_3d %>%
+  filter(p_val_adj < 0.01) %>%
+  arrange(p_val_adj) %>%
+  head(15)
+```
+
+
+```{r}
+library(ggrepel)
+ggplot(Diff_exp_2d_3d, aes(avg_log2FC, -log10(p_val_adj), color = sig)) +
+  geom_point(size = 1.5) +
+  geom_text_repel(
+    data = top_genes,
+    aes(label = gene),
+    size = 3
+  ) +
+  scale_color_manual(values = c(
+    "Up in TGFb_pretreatment" = "firebrick",
+    "Up in Untreated" = "steelblue",
+    "NS" = "grey70"
+  )) +
+  theme_classic()
+```
+
+
+```{r, eval=FALSE}
+qs_save(integrated_mt,
+        file = here::here(output_dir_data, "integrated_mt.qs2"),
+        nthreads = 32
+        )
+
+qs_save(integrated_ec,
+        file = here::here(output_dir_data, "integrated_ec.qs2"),
+        nthreads = 32
+        )
+```
+
+
