@@ -1,0 +1,903 @@
+---
+title: "QC, integration, and annotation of RVS samples"
+author: "GinoBonazza (ginoandrea.bonazza@usz.ch)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r knitr config, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(dpi = 300, fig.align = "center")
+```
+
+## Setup
+
+```{r setup, class.source = "fold-hide"}
+current_file <- "RVS_QC_integration_annotation"
+
+library(here)
+library(readr)
+library(readxl)
+library(Seurat)
+library(DropletUtils)
+library(Matrix)
+library(scDblFinder)
+library(scCustomize)
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+library(tidyverse)
+library(reshape2)
+library(S4Vectors)
+library(SingleCellExperiment)
+library(pheatmap)
+library(png)
+library(gridExtra)
+library(knitr)
+library(scales)
+library(RColorBrewer)
+library(Matrix.utils)
+library(tibble)
+library(scater)
+library(patchwork)
+library(statmod)
+library(clustree)
+library(harmony)
+library(speckle)
+library(qs2)
+
+output_dir_data <- here::here("output", current_file)
+if (!dir.exists(output_dir_data)) dir.create(output_dir_data)
+
+if (!dir.exists(here::here("docs", "figure"))) dir.create(here::here("docs", "figure"))
+
+output_dir_figs <- here::here("docs", "figure", paste0(current_file, ".Rmd"))
+if (!dir.exists(output_dir_figs)) dir.create(output_dir_figs)
+```
+
+## Quality control
+
+Load and merge CellBender and Cell Ranger output for the two RVS samples only.
+
+```{r load data, echo=TRUE, results="hide"}
+cell_bender_merged <- Read_CellBender_h5_Multi_File(
+  merge = TRUE,
+  data_dir = here::here("data", "Cellbender_output"),
+  custom_name = "_filtered.h5",
+  sample_list = c(
+    "cellbender_output_RVS_200625_d0",
+    "cellbender_output_RVS_200625_d14_A1"
+  ),
+  sample_names = c(
+    "RVS_200625_d0",
+    "RVS_200625_d14_A1"
+  )
+)
+
+cell_ranger_merged <- Read10X_h5_GEO(
+  merge = TRUE,
+  data_dir = here::here("data", "Cellranger_output"),
+  shared_suffix = "_filtered_feature_bc_matrix.h5",
+  sample_list = c(
+    "RVS_200625_d0",
+    "RVS_200625_d14_A1"
+  ),
+  sample_names = c(
+    "RVS_200625_d0",
+    "RVS_200625_d14_A1"
+  )
+)
+
+RVS_preQC <- Create_CellBender_Merged_Seurat(
+  raw_cell_bender_matrix = cell_bender_merged,
+  raw_counts_matrix = cell_ranger_merged,
+  raw_assay_name = "RAW",
+  cell_bender_assay_name = "RNA"
+)
+
+rm(cell_bender_merged, cell_ranger_merged)
+```
+
+Add metadata: sample, time point, mitochondrial percentage, and ribosomal percentage.
+
+```{r add metadata}
+cn <- Cells(RVS_preQC)
+
+RVS_preQC$Sample <- dplyr::case_when(
+  grepl("^RVS_200625_d0[_-]", cn) ~ "RVS_200625_d0",
+  grepl("^RVS_200625_d14_A1[_-]", cn) ~ "RVS_200625_d14_A1",
+  TRUE ~ NA_character_
+)
+
+RVS_preQC$time_point <- dplyr::case_when(
+  RVS_preQC$Sample == "RVS_200625_d0" ~ "d0",
+  RVS_preQC$Sample == "RVS_200625_d14_A1" ~ "d14",
+  TRUE ~ NA_character_
+)
+
+RVS_preQC$condition <- RVS_preQC$time_point
+
+RVS_preQC[["percent.mt"]] <- PercentageFeatureSet(RVS_preQC, pattern = "^MT-")
+RVS_preQC[["percent.rp"]] <- PercentageFeatureSet(RVS_preQC, pattern = "^RP[SL]")
+
+table(RVS_preQC$Sample, useNA = "ifany")
+```
+
+Check how much CellBender affected the dataset.
+
+```{r Cellbender, fig.height=4, fig.width=7}
+table(RVS_preQC$Sample)
+
+RVS_preQC <- Add_CellBender_Diff(
+  seurat_object = RVS_preQC,
+  raw_assay_name = "RAW",
+  cell_bender_assay_name = "RNA"
+)
+
+median_stats <- Median_Stats(
+  seurat_object = RVS_preQC,
+  group_by_var = "Sample",
+  median_var = c("nCount_Diff", "nFeature_Diff")
+)
+median_stats
+
+feature_diff <- CellBender_Feature_Diff(
+  seurat_object = RVS_preQC,
+  raw_assay = "RAW",
+  cell_bender_assay = "RNA"
+)
+head(feature_diff)
+
+CellBender_Diff_Plot(feature_diff_df = feature_diff)
+```
+
+Check quality control parameters before filtering.
+
+```{r QC_pre_VlnPlots, fig.height=4, fig.width=8}
+p1 <- VlnPlot(RVS_preQC, features = "nCount_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS_preQC, features = "nFeature_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p3 <- VlnPlot(RVS_preQC, features = "percent.mt", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p4 <- VlnPlot(RVS_preQC, features = "percent.rp", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_VlnPlots <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+QC_pre_VlnPlots
+```
+
+```{r QC_pre_VlnPlots_zoom, fig.height=4, fig.width=8}
+p1 <- VlnPlot(RVS_preQC, features = "nCount_RNA", group.by = "Sample", pt.size = 0, y.max = 20000) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS_preQC, features = "nFeature_RNA", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+p3 <- VlnPlot(RVS_preQC, features = "percent.mt", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+p4 <- VlnPlot(RVS_preQC, features = "percent.rp", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_VlnPlots_zoom <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+QC_pre_VlnPlots_zoom
+```
+
+Doublet detection.
+
+```{r doublets detection}
+RVS_preQC_sce <- as.SingleCellExperiment(RVS_preQC)
+RVS_preQC_sce <- scDblFinder(RVS_preQC_sce, samples = "Sample", clusters = TRUE)
+table(RVS_preQC_sce@colData$scDblFinder.class)
+
+RVS_preQC <- as.Seurat(RVS_preQC_sce, counts = "counts", data = "logcounts")
+rm(RVS_preQC_sce)
+
+RVS_preQC@meta.data[RVS_preQC@meta.data$scDblFinder.class %in% "singlet", "scDblFinder.n"] <- paste0("Singlets (n=", table(RVS_preQC$scDblFinder.class)["singlet"], ")")
+RVS_preQC@meta.data[RVS_preQC@meta.data$scDblFinder.class %in% "doublet", "scDblFinder.n"] <- paste0("Doublets (n=", table(RVS_preQC$scDblFinder.class)["doublet"], ")")
+RVS_preQC$scDblFinder.n <- factor(RVS_preQC$scDblFinder.n)
+```
+
+```{r QC_pre_Doublets, fig.height=4, fig.width=6}
+p1 <- VlnPlot(RVS_preQC, features = "nCount_RNA", split.by = "scDblFinder.n", group.by = "Sample", pt.size = 0, y.max = 50000) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS_preQC, features = "nFeature_RNA", split.by = "scDblFinder.n", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank())
+
+QC_pre_Doublets <- p1 + p2 + plot_layout(ncol = 2)
+QC_pre_Doublets
+```
+
+```{r save RVS_preQC}
+qs_save(
+  RVS_preQC,
+  file = here::here(output_dir_data, "RVS_preQC.qs2"),
+  nthreads = 32
+)
+```
+
+Remove doublets.
+
+```{r remove doublets}
+RVS <- subset(RVS_preQC, subset = scDblFinder.class == "singlet")
+table(RVS$scDblFinder.class)
+rm(RVS_preQC)
+
+RVS@assays[["RAW"]] <- NULL
+DefaultAssay(RVS) <- "RNA"
+```
+
+Check quality control parameters after removing doublets.
+
+```{r QC_pre_no_doublets_VlnPlots, fig.height=4, fig.width=8}
+p1 <- VlnPlot(RVS, features = "nCount_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS, features = "nFeature_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p3 <- VlnPlot(RVS, features = "percent.mt", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p4 <- VlnPlot(RVS, features = "percent.rp", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_no_doublets_VlnPlots <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+QC_pre_no_doublets_VlnPlots
+```
+
+```{r QC_pre_no_doublets_VlnPlots_zoom, fig.height=4, fig.width=8}
+p1 <- VlnPlot(RVS, features = "nCount_RNA", group.by = "Sample", pt.size = 0, y.max = 20000) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS, features = "nFeature_RNA", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+p3 <- VlnPlot(RVS, features = "percent.mt", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+p4 <- VlnPlot(RVS, features = "percent.rp", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_pre_no_doublets_VlnPlots_zoom <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+QC_pre_no_doublets_VlnPlots_zoom
+```
+
+Filter based on number of counts, features, and percentage of mitochondrial genes.
+
+```{r filter}
+RVS <- subset(
+  RVS,
+  subset = nFeature_RNA > 300 &
+    percent.mt < 20 &
+    nCount_RNA > 500 &
+    nCount_RNA < 100000
+)
+
+table(RVS$Sample)
+```
+
+```{r cols}
+cell_type_cols <- c("#d05050", "#33A02C", "#1F78B4", "#CAB2D6", "#FF7F00", "#B2DF8A", "#B15928", "#FFD000", "#FA95C0", "#FDBF6F", "#6A3D9A", "#7aCDF9", "#E6E600", "#8DD3C7", "#FB8072")
+sample_cols <- c(
+  "RVS_200625_d0"     = "#BDBDBD",
+  "RVS_200625_d14_A1" = "#B85C4A"
+)
+cluster_cols <- DiscretePalette_scCustomize(num_colors = 20, palette = "polychrome", shuffle_pal = TRUE, seed = 220510)
+```
+
+```{r plot_cols, fig.height=3, fig.width=10}
+PalettePlot(cell_type_cols) + PalettePlot(sample_cols) + PalettePlot(cluster_cols)
+```
+
+Check quality control parameters after filtering.
+
+```{r QC_post_VlnPlots, fig.height=4, fig.width=8}
+p1 <- VlnPlot(RVS, features = "nCount_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS, features = "nFeature_RNA", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p3 <- VlnPlot(RVS, features = "percent.mt", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+p4 <- VlnPlot(RVS, features = "percent.rp", group.by = "Sample", pt.size = 0) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_post_VlnPlots <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+QC_post_VlnPlots
+```
+
+```{r QC_post_VlnPlots_zoom, fig.height=4, fig.width=8}
+p1 <- VlnPlot(RVS, features = "nCount_RNA", group.by = "Sample", pt.size = 0, y.max = 20000) + theme(axis.title.x = element_blank()) + NoLegend()
+p2 <- VlnPlot(RVS, features = "nFeature_RNA", group.by = "Sample", pt.size = 0, y.max = 10000) + theme(axis.title.x = element_blank()) + NoLegend()
+p3 <- VlnPlot(RVS, features = "percent.mt", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+p4 <- VlnPlot(RVS, features = "percent.rp", group.by = "Sample", pt.size = 0, y.max = 5) + theme(axis.title.x = element_blank()) + NoLegend()
+
+QC_post_VlnPlots_zoom <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+QC_post_VlnPlots_zoom
+```
+
+## Integration and clustering
+
+Normalize and scale using SCTransform.
+
+```{r SCTransform, message=FALSE, warning=FALSE, echo=TRUE, results="hide"}
+DefaultAssay(RVS) <- "RNA"
+RVS <- SplitObject(RVS, split.by = "Sample")
+
+for (i in 1:length(RVS)) {
+  RVS[[i]] <- SCTransform(
+    RVS[[i]],
+    vst.flavor = "v2",
+    vars.to.regress = c("percent.mt"),
+    return.only.var.genes = TRUE,
+    variable.features.n = 3000,
+    method = "glmGamPoi"
+  )
+}
+```
+
+PCA.
+
+```{r PCA}
+features <- SelectIntegrationFeatures(object.list = RVS, nfeatures = 3000)
+RVS <- merge(x = RVS[[1]], y = RVS[2:length(RVS)], merge.data = TRUE)
+VariableFeatures(RVS) <- features
+RVS <- RunPCA(RVS, npcs = 50)
+```
+
+```{r Elbow_not_integrated, fig.width=4, fig.height=4}
+ElbowPlot(RVS, ndims = 50)
+```
+
+Clustering without integration.
+
+```{r clustering not integrated}
+DefaultAssay(RVS) <- "SCT"
+RVS <- RunUMAP(RVS, dims = 1:50)
+RVS <- FindNeighbors(RVS, dims = 1:50)
+RVS <- FindClusters(RVS, resolution = seq(0.1, 0.8, by = 0.1))
+```
+
+```{r Clustree_not_integrated, fig.width=6, fig.height=9}
+clustree::clustree(
+  RVS@meta.data[, grep("SCT_snn_res", colnames(RVS@meta.data))],
+  prefix = "SCT_snn_res."
+)
+```
+
+```{r UMAPs_not_integrated, fig.width=10, fig.height=4}
+DimPlot(
+  RVS,
+  reduction = "umap",
+  shuffle = TRUE,
+  group.by = c("SCT_snn_res.0.3", "Sample"),
+  ncol = 2,
+  label = TRUE
+)
+```
+
+Integrate the samples using Harmony.
+
+```{r RunHarmony}
+RVS <- RunHarmony(
+  RVS,
+  assay.use = "SCT",
+  group.by.vars = "Sample",
+  dims.use = 1:50,
+  plot_convergence = TRUE,
+  .options = harmony_options(max.iter.cluster = 100)
+)
+```
+
+Clustering after integration.
+
+```{r clustering integrated}
+DefaultAssay(RVS) <- "SCT"
+RVS <- RunUMAP(RVS, dims = 1:50, reduction = "harmony")
+RVS <- FindNeighbors(RVS, dims = 1:50, reduction = "harmony")
+RVS <- FindClusters(RVS, resolution = seq(0.1, 0.8, by = 0.1))
+```
+
+```{r Clustree_integrated_low_quality, fig.width=6, fig.height=9}
+clustree::clustree(
+  RVS@meta.data[, grep("SCT_snn_res", colnames(RVS@meta.data))],
+  prefix = "SCT_snn_res."
+)
+```
+
+```{r UMAPs_integrated_low_quality, fig.width=10, fig.height=4}
+DimPlot(
+  RVS,
+  reduction = "umap",
+  shuffle = TRUE,
+  group.by = c("SCT_snn_res.0.7", "Sample"),
+  ncol = 2,
+  label = FALSE
+)
+```
+```{r UMAPs_integrated_low_quality_label, fig.width=10, fig.height=4}
+DimPlot(
+  RVS,
+  reduction = "umap",
+  shuffle = TRUE,
+  group.by = c("SCT_snn_res.0.7", "Sample"),
+  ncol = 2,
+  label = TRUE
+)
+```
+
+Find marker genes for the integrated clusters before possible removal of low-quality cells.
+
+```{r FindAllMarkers low quality}
+DefaultAssay(RVS) <- "RNA"
+RVS <- NormalizeData(RVS)
+Idents(RVS) <- "SCT_snn_res.0.7"
+
+Markers <- FindAllMarkers(RVS, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 1)
+write.csv(Markers, here::here(output_dir_data, "RVS_Markers_all_low_quality.csv"))
+
+Markers_top10 <- as.data.frame(Markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC))
+write.csv(Markers_top10, here::here(output_dir_data, "RVS_Markers_top10_low_quality.csv"))
+
+Markers_top3 <- as.data.frame(Markers %>% group_by(cluster) %>% top_n(n = 3, wt = avg_log2FC))
+write.csv(Markers_top3, here::here(output_dir_data, "RVS_Markers_top3_low_quality.csv"))
+```
+
+```{r Heatmap_low_quality, fig.width=14, fig.height=10}
+heatmap_cols <- colorRampPalette(RColorBrewer::brewer.pal(9, "RdBu"))(256)
+heatmap_cols <- rev(heatmap_cols[1:256])
+
+Heatmap <- DoHeatmap(
+  RVS,
+  label = FALSE,
+  draw.line = FALSE,
+  features = Markers_top10$gene,
+  assay = "SCT"
+) +
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(axis.text.y = element_text(size = 5)) +
+  theme(plot.margin = unit(c(0.1, 0, 0, 0), "inches"))
+
+Heatmap
+```
+
+Check QC parameters in each cluster.
+
+```{r QC_VlnPlots_low_quality, fig.width=12, fig.height=6}
+VlnPlot(
+  RVS,
+  features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"),
+  ncol = 3,
+  pt.size = 0
+) + theme(axis.title.x = element_blank())
+```
+
+Check cell cycle genes.
+
+```{r Cell_cycle_UMAP, fig.width=5, fig.height=4}
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+RVS <- CellCycleScoring(RVS, s.features = s.genes, g2m.features = g2m.genes)
+
+DimPlot(
+  RVS,
+  reduction = "umap",
+  shuffle = TRUE,
+  group.by = "Phase"
+)
+```
+
+## Cell type annotation
+
+Placeholder annotation based on resolution 0.3. Change this after checking the marker genes.
+
+```{r annotation}
+
+cluster_annotation <- c( "0" = "CM I", "1" = "EC I", "2" = "EC II", "3" = "Fibroblasts", "4" = "Pericytes", "5" = "CM high MT I", "6" = "CM high MT II", "7" = "CM high MT III", "8" = "Macrophages", "9" = "Smooth Muscle Cells", "10" = "T cells", "11" = "CM II", "12" = "EC III", "13" = "EC IV", "14" = "Neuronal" ) 
+RVS$cell_type <- plyr::mapvalues( x = as.character(RVS$SCT_snn_res.0.7), from = names(cluster_annotation), to = unname(cluster_annotation) )
+
+cell_type_counts <- sort(table(RVS$cell_type), decreasing = TRUE)
+
+cm_levels <- c(
+  "CM I",
+  "CM II",
+  "CM high MT I",
+  "CM high MT II",
+  "CM high MT III"
+)
+
+ec_levels <- c(
+  "EC I",
+  "EC II",
+  "EC III",
+  "EC IV"
+)
+
+other_levels <- names(cell_type_counts)[
+  !names(cell_type_counts) %in% c(cm_levels, ec_levels)
+]
+
+new_cell_type_levels <- c(
+  cm_levels,
+  ec_levels,
+  other_levels
+)
+
+RVS$cell_type <- factor(
+  RVS$cell_type,
+  levels = new_cell_type_levels
+)
+
+Idents(RVS) <- RVS$cell_type
+
+table(RVS$cell_type, useNA = "ifany")
+```
+
+```{r}
+RVS <- qs_read(file = here::here(output_dir_data, "RVS.qs2"),
+  nthreads = 32)
+```
+
+```{r QC_sample, fig.width=12, fig.height=8}
+VlnPlot_scCustom(
+  RVS,
+  features = c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.rp", "scDblFinder.score"),
+  group.by = "cell_type",
+  num_columns = 3,
+  pt.size = 0,
+  colors_use = cell_type_cols
+) & theme(axis.title.x = element_blank())
+```
+
+```{r UMAP_cluster, fig.height=5, fig.width=5}
+DimPlot_scCustom(RVS, group.by = "SCT_snn_res.0.3", colors_use = cluster_cols, label = TRUE)
+```
+
+```{r UMAP_sample, fig.width=5, fig.height=5}
+DimPlot(
+  RVS,
+  group.by = "Sample",
+  reduction = "umap",
+  cols = sample_cols,
+  label = FALSE,
+  shuffle = TRUE,
+  pt.size = 1
+) +
+  NoLegend() +
+  theme(
+    axis.text = element_text(size = 8, face = "bold"),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_blank()
+  )
+```
+
+```{r UMAP_sample_split, fig.width=8, fig.height=4}
+DimPlot(
+  RVS,
+  group.by = "Sample",
+  split.by = "Sample",
+  reduction = "umap",
+  cols = sample_cols,
+  label = FALSE,
+  shuffle = TRUE,
+  pt.size = 0.5
+) +
+  NoLegend() +
+  theme(
+    axis.text = element_text(size = 8, face = "bold"),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    strip.text = element_text(size = 11, face = "bold")
+  )
+```
+
+```{r UMAP_cell_type, fig.width=5, fig.height=5}
+p <- DimPlot(
+  RVS,
+  group.by = "cell_type",
+  reduction = "umap",
+  cols = cell_type_cols,
+  label = FALSE,
+  shuffle = TRUE,
+  pt.size = 1
+) +
+  NoLegend() +
+  theme(
+    axis.text = element_text(size = 8, face = "bold"),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_blank()
+  )
+
+LabelClusters(
+  p,
+  id = "cell_type",
+  size = 4,
+  repel = TRUE
+)
+```
+
+```{r UMAP_percent_mt, fig.width=5, fig.height=5}
+FeaturePlot(
+  RVS,
+  features = "percent.mt",
+  reduction = "umap",
+  pt.size = 1,
+  order = TRUE
+) +
+  scale_color_gradientn(
+    colors = c("grey90", "#FDBF6F", "#d05050")
+  ) +
+  NoLegend() +
+  theme(
+    axis.text = element_text(size = 8, face = "bold"),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_blank()
+  )
+```
+
+```{r}
+get_unique_top_markers <- function(markers, n = 10, cluster_col = "cluster", gene_col = "gene") {
+  
+  markers <- markers %>%
+    dplyr::arrange(.data[[cluster_col]], dplyr::desc(avg_log2FC))
+  
+  clusters <- unique(markers[[cluster_col]])
+  used_genes <- character(0)
+  out <- list()
+  
+  for (cl in clusters) {
+    
+    cl_markers <- markers %>%
+      dplyr::filter(.data[[cluster_col]] == cl) %>%
+      dplyr::filter(!.data[[gene_col]] %in% used_genes) %>%
+      dplyr::slice_head(n = n)
+    
+    used_genes <- c(used_genes, cl_markers[[gene_col]])
+    out[[as.character(cl)]] <- cl_markers
+  }
+  
+  dplyr::bind_rows(out)
+}
+```
+
+```{r FindAllMarkers cell_type}
+DefaultAssay(RVS) <- "RNA"
+Idents(RVS) <- "cell_type"
+
+Markers <- FindAllMarkers(RVS, only.pos = TRUE, min.pct = 0.5, logfc.threshold = 1)
+write.csv(Markers, here::here(output_dir_data, "RVS_Markers_all_cell_type.csv"))
+
+Markers_top10 <- get_unique_top_markers(
+  markers = Markers,
+  n = 10,
+  cluster_col = "cluster",
+  gene_col = "gene"
+)
+write.csv(Markers_top10, here::here(output_dir_data, "RVS_Markers_top10_cell_type.csv"))
+
+Markers_top3 <- get_unique_top_markers(
+  markers = Markers,
+  n = 3,
+  cluster_col = "cluster",
+  gene_col = "gene"
+)
+write.csv(Markers_top3, here::here(output_dir_data, "RVS_Markers_top3_cell_type.csv"))
+```
+
+```{r Heatmap_cell_type, fig.width=12, fig.height=10}
+genes.use <- intersect(Markers_top10$gene, rownames(RVS[["SCT"]]@scale.data))
+DefaultAssay(RVS) <- "SCT"
+
+Heatmap <- DoHeatmap(
+  RVS,
+  features = genes.use,
+  label = FALSE,
+  draw.line = TRUE,
+  group.by = "cell_type",
+  group.colors = cell_type_cols,
+  lines.width = 1
+) +
+  scale_fill_gradientn(colours = heatmap_cols) +
+  theme(text = element_text(size = 15), axis.text.y = element_text(size = 6))
+
+Heatmap
+```
+
+```{r DotPlot_markers, fig.width=12, fig.height=6}
+Idents(RVS) <- factor(Idents(RVS), levels = rev(levels(Idents(RVS))))
+
+p <- DotPlot_scCustom(
+  RVS,
+  features = unique(Markers_top3$gene),
+  x_lab_rotate = TRUE
+)
+
+p + theme(
+  axis.text.x = element_text(size = 12, angle = 60, vjust = 1, hjust = 1),
+  axis.text.y = element_text(size = 15)
+)
+
+Idents(RVS) <- RVS$cell_type
+```
+
+```{r FeatPlot_canonical_markers, fig.width=14, fig.height=9}
+FeaturePlot_scCustom(
+  RVS,
+  features = c(
+    "RYR2", "TTN", "COL1A1", "DCN", "VWF", "PECAM1", "RGS5",
+    "MRC1", "CD68", "PTPRC", "RGS6"
+  ),
+  num_columns = 4,
+  order = FALSE
+)
+```
+
+```{r Barplot_Sample, fig.height=7, fig.width=8, message=FALSE}
+props <- getTransformedProps(RVS$cell_type, RVS$Sample, transform = "logit")
+
+par(mar = c(14, 5, 1, 18), xpd = TRUE)
+barplot(
+  props$Proportions,
+  legend = FALSE,
+  ylab = "Proportions",
+  col = cell_type_cols,
+  cex.names = 1.4,
+  las = 2,
+  font.lab = 2,
+  font.axis = 2,
+  cex.axis = 1,
+  cex.lab = 1.4
+)
+legend(
+  "topright",
+  inset = c(-0.8, -0),
+  legend = rownames(props$Proportions),
+  fill = cell_type_cols,
+  bty = "n",
+  cex = 1.2
+)
+```
+
+```{r Barplot_cell_type, fig.height=5, fig.width=10, message=FALSE}
+props <- getTransformedProps(RVS$Sample, RVS$cell_type, transform = "logit")
+
+par(mar = c(12, 5, 1, 14), xpd = TRUE)
+barplot(
+  props$Proportions,
+  legend = FALSE,
+  ylab = "Proportions",
+  col = sample_cols,
+  cex.names = 1.2,
+  las = 2,
+  font.lab = 2,
+  font.axis = 2,
+  cex.axis = 1,
+  cex.lab = 1.4
+)
+legend(
+  "topright",
+  inset = c(-0.4, 0.3),
+  legend = rownames(props$Proportions),
+  fill = sample_cols,
+  bty = "n",
+  cex = 1.2
+)
+```
+
+```{r summary tables}
+dim(RVS)
+table(RVS$Sample)
+table(RVS$cell_type)
+table(RVS$Sample, RVS$cell_type)
+```
+
+```{r cell_type_count_heatmap_table, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=3}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(tibble)
+
+cell_type_levels <- levels(RVS$cell_type)
+
+cell_type_count_long <- RVS@meta.data %>%
+  dplyr::count(Sample, cell_type, name = "Nuclei") %>%
+  tidyr::complete(
+    Sample,
+    cell_type = cell_type_levels,
+    fill = list(Nuclei = 0)
+  ) %>%
+  dplyr::mutate(
+    Sample = dplyr::case_when(
+      Sample == "RVS_200625_d0" ~ "d0",
+      Sample == "RVS_200625_d14_A1" ~ "d14",
+      TRUE ~ as.character(Sample)
+    )
+  )
+
+# add total column
+sample_totals <- cell_type_count_long %>%
+  dplyr::group_by(Sample) %>%
+  dplyr::summarise(Nuclei = sum(Nuclei), .groups = "drop") %>%
+  dplyr::mutate(cell_type = "Total")
+
+# add total row
+cell_type_totals <- cell_type_count_long %>%
+  dplyr::group_by(cell_type) %>%
+  dplyr::summarise(Nuclei = sum(Nuclei), .groups = "drop") %>%
+  dplyr::mutate(Sample = "Total")
+
+# add grand total
+grand_total <- tibble(
+  Sample = "Total",
+  cell_type = "Total",
+  Nuclei = sum(cell_type_count_long$Nuclei)
+)
+
+plot_df <- dplyr::bind_rows(
+  cell_type_count_long,
+  sample_totals,
+  cell_type_totals,
+  grand_total
+) %>%
+  dplyr::mutate(
+    cell_type = factor(cell_type, levels = c(cell_type_levels, "Total")),
+    is_total = Sample == "Total" | cell_type == "Total",
+    fill_value = ifelse(is_total, NA, Nuclei),
+
+    # force row order manually
+    y_pos = dplyr::case_when(
+      Sample == "d0" ~ 3,
+      Sample == "d14" ~ 2,
+      Sample == "Total" ~ 1
+    )
+  )
+
+n_x <- length(c(cell_type_levels, "Total"))
+
+ggplot(plot_df, aes(x = cell_type, y = y_pos)) +
+  geom_tile(
+    data = dplyr::filter(plot_df, !is_total),
+    aes(fill = fill_value),
+    color = NA
+  ) +
+  geom_tile(
+    data = dplyr::filter(plot_df, is_total),
+    fill = "grey90",
+    color = NA
+  ) +
+  geom_vline(
+    xintercept = seq(1.5, n_x - 0.5, by = 1),
+    colour = "grey75",
+    linewidth = 0.8
+  ) +
+  geom_hline(
+    yintercept = c(1.5, 2.5),
+    colour = "grey75",
+    linewidth = 0.8
+  ) +
+  geom_text(aes(label = Nuclei), size = 3.4, fontface = "bold") +
+  scale_y_continuous(
+    breaks = c(3, 2, 1),
+    labels = c("d0", "d14", "Total"),
+    limits = c(0.5, 3.5),
+    expand = c(0, 0)
+  ) +
+  scale_fill_gradient(
+    low = "grey95",
+    high = "#A63A2A",
+    na.value = "grey90",
+    guide = "none"
+  ) +
+  labs(
+    title = "Number of nuclei per cell type and sample",
+    x = NULL,
+    y = NULL
+  ) +
+  theme_classic(base_size = 13) +
+  theme(
+    axis.line = element_blank(),
+    panel.border = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(face = "bold", angle = 45, hjust = 1, vjust = 1),
+    axis.text.y = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
+
+## Save final objects
+
+```{r save RVS final, eval=FALSE}
+qs_save(
+  RVS,
+  file = here::here(output_dir_data, "RVS.qs2"),
+  nthreads = 32
+)
+```
+
+```{r save RVS RNA, eval=FALSE}
+RVS_RNA <- RVS
+RVS_RNA@assays[["SCT"]] <- NULL
+DefaultAssay(RVS_RNA) <- "RNA"
+
+qs_save(
+  RVS_RNA,
+  file = here::here(output_dir_data, "RVS_RNA.qs2"),
+  nthreads = 32
+)
+
+rm(RVS_RNA)
+```
